@@ -1,0 +1,79 @@
+<main class="page">
+  <section class="card">
+    <header class="header">
+      <h1>Cloud Files MVP</h1>
+      <p>Загрузка, получение и удаление файлов в MinIO</p>
+    </header>
+
+    <div class="upload-row">
+      <input type="file" (change)="onFileSelected($event)" />
+      <button
+        type="button"
+        class="primary-btn"
+        [disabled]="!selectedFile || isUploading"
+        (click)="uploadSelectedFile()"
+      >
+        {{ isUploading ? 'Загрузка...' : 'Загрузить' }}
+      </button>
+      <button
+        type="button"
+        class="ghost-btn"
+        [disabled]="isLoading"
+        (click)="refreshFiles()"
+      >
+        Обновить
+      </button>
+    </div>
+
+    @if (actionMessage) {
+      <p class="message success">{{ actionMessage }}</p>
+    }
+    @if (errorMessage) {
+      <p class="message error">{{ errorMessage }}</p>
+    }
+
+    <div class="files">
+      <div class="files-head">
+        <h2>Файлы</h2>
+        @if (isLoading) {
+          <span class="muted">Загрузка списка...</span>
+        }
+      </div>
+
+      @if (files.length === 0 && !isLoading) {
+        <p class="muted">Пока нет загруженных файлов.</p>
+      } @else {
+        <ul class="files-list">
+          @for (file of files; track trackByFileName($index, file)) {
+            <li class="file-item">
+              <div class="file-meta">
+                <strong>{{ file.file_name || file.object_key }}</strong>
+                <span class="muted">blob_id: {{ file.blob_id }}</span>
+                <span class="muted">
+                  {{ file.content_type || 'application/octet-stream' }} ·
+                  {{ file.created_at | date: 'short' }}
+                </span>
+              </div>
+              <div class="actions">
+                <button
+                  type="button"
+                  class="ghost-btn"
+                  (click)="downloadFile(file)"
+                >
+                  Скачать
+                </button>
+                <button
+                  type="button"
+                  class="danger-btn"
+                  (click)="deleteFile(file)"
+                >
+                  Удалить
+                </button>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </section>
+</main>

@@ -1,0 +1,80 @@
+# Репозиторий только frontend: корень = этот каталог.
+#
+# Secrets (Settings → Secrets and variables → Actions) — в репозитории фронта:
+#   DEPLOY_HOST      — IP или домен VM
+#   DEPLOY_USER      — пользователь SSH
+#   DEPLOY_SSH_KEY   — приватный ключ (PEM целиком)
+#   DEPLOY_PATH      — каталог git clone этого репозитория на сервере (например /home/user1/cloud-frontend)
+#
+# На сервере: clone этого репо в DEPLOY_PATH, backend уже слушает :8080 на хосте.
+# Первый раз: cd DEPLOY_PATH && docker compose up -d
+
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "src/**"
+      - "angular.json"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "Dockerfile"
+      - "nginx.conf"
+      - "docker-compose.yml"
+      - ".github/workflows/frontend-ci-cd.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "angular.json"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - ".github/workflows/frontend-ci-cd.yml"
+
+concurrency:
+  group: frontend-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Install & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: ng build
+        run: npm run build
+
+  deploy:
+    name: Deploy to VM
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -eu
+            cd "${{ secrets.DEPLOY_PATH }}"
+
+            git fetch origin
+            git checkout master
+            git pull origin master
+
+            docker compose up -d --build --force-recreate frontend

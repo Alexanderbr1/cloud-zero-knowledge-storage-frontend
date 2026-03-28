@@ -1,0 +1,12 @@
+# Отдельный репозиторий фронтенда: Nginx + статика Angular.
+# API на хосте :8080 (тот же сервер, что и backend). Нужен extra_hosts для host.docker.internal.
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4200:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
