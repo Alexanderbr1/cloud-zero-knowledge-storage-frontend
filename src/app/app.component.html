@@ -5,46 +5,91 @@
       <p>Загрузка, получение и удаление файлов в MinIO</p>
     </header>
 
+    <div class="auth-row">
+      @if (!isAuthed()) {
+        <form (ngSubmit)="submitAuth()" [formGroup]="loginForm" class="auth-form">
+          <div class="auth-toggle">
+            <button
+              type="button"
+              class="ghost-btn"
+              [class.active]="authMode() === 'login'"
+              (click)="setAuthMode('login')"
+            >
+              Вход
+            </button>
+            <button
+              type="button"
+              class="ghost-btn"
+              [class.active]="authMode() === 'register'"
+              (click)="setAuthMode('register')"
+            >
+              Регистрация
+            </button>
+          </div>
+          <label class="auth-field">
+            <span class="muted">Email</span>
+            <input type="email" formControlName="email" placeholder="you@example.com" />
+          </label>
+          <label class="auth-field">
+            <span class="muted">Пароль</span>
+            <input type="password" formControlName="password" placeholder="••••••••" />
+          </label>
+          <button type="submit" class="primary-btn" [disabled]="isLoggingIn() || loginForm.invalid">
+            {{
+              isLoggingIn()
+                ? (authMode() === 'register' ? 'Создание...' : 'Вход...')
+                : (authMode() === 'register' ? 'Создать аккаунт' : 'Войти')
+            }}
+          </button>
+        </form>
+      } @else {
+        <div class="muted auth-status">Вы авторизованы</div>
+        <button type="button" class="ghost-btn" (click)="logout()">Выйти</button>
+      }
+    </div>
+
     <div class="upload-row">
       <input type="file" (change)="onFileSelected($event)" />
       <button
         type="button"
         class="primary-btn"
-        [disabled]="!selectedFile || isUploading"
+        [disabled]="!isAuthed() || !selectedFile() || isUploading()"
         (click)="uploadSelectedFile()"
       >
-        {{ isUploading ? 'Загрузка...' : 'Загрузить' }}
+        {{ isUploading() ? 'Загрузка...' : 'Загрузить' }}
       </button>
       <button
         type="button"
         class="ghost-btn"
-        [disabled]="isLoading"
+        [disabled]="!isAuthed() || isLoading()"
         (click)="refreshFiles()"
       >
         Обновить
       </button>
     </div>
 
-    @if (actionMessage) {
-      <p class="message success">{{ actionMessage }}</p>
+    @if (actionMessage()) {
+      <p class="message success">{{ actionMessage() }}</p>
     }
-    @if (errorMessage) {
-      <p class="message error">{{ errorMessage }}</p>
+    @if (errorMessage()) {
+      <p class="message error">{{ errorMessage() }}</p>
     }
 
     <div class="files">
       <div class="files-head">
         <h2>Файлы</h2>
-        @if (isLoading) {
+        @if (isLoading()) {
           <span class="muted">Загрузка списка...</span>
         }
       </div>
 
-      @if (files.length === 0 && !isLoading) {
+      @if (!isAuthed()) {
+        <p class="muted">Войдите, чтобы увидеть ваши файлы.</p>
+      } @else if (files().length === 0 && !isLoading()) {
         <p class="muted">Пока нет загруженных файлов.</p>
       } @else {
         <ul class="files-list">
-          @for (file of files; track trackByFileName($index, file)) {
+          @for (file of files(); track trackByFileName($index, file)) {
             <li class="file-item">
               <div class="file-meta">
                 <strong>{{ file.file_name || file.object_key }}</strong>

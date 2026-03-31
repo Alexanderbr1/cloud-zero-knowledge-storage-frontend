@@ -35,6 +35,45 @@
   flex-wrap: wrap;
 }
 
+.auth-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.auth-form {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.auth-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.auth-toggle .ghost-btn.active {
+  background: #111827;
+  color: #fff;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 220px;
+}
+
+.auth-status {
+  flex: 1;
+}
+
 button {
   border: none;
   border-radius: 8px;
