@@ -11,14 +11,19 @@
   <main class="files-shell">
     <div class="files-backdrop" aria-hidden="true"></div>
 
-    <section class="files-card">
+    <section class="files-card" aria-labelledby="files-main-title">
       <header class="files-brand">
         <div class="files-brand-mark" aria-hidden="true">C</div>
         <div class="files-brand-text">
-          <h1 class="files-title">Cloud Files</h1>
+          <h1 id="files-main-title" class="files-title">Cloud Files</h1>
           <p class="files-subtitle">Файлы в облачном хранилище</p>
         </div>
-        <button type="button" class="u-btn u-btn-ghost files-logout" (click)="logout()">
+        <button
+          type="button"
+          class="u-btn u-btn-ghost files-logout"
+          aria-label="Выйти из аккаунта"
+          (click)="logout()"
+        >
           Выйти
         </button>
       </header>
@@ -29,7 +34,12 @@
 
         <div class="files-toolbar">
           <div class="file-picker">
-            <label class="file-picker-label">
+            <label
+              class="file-picker-label"
+              [attr.aria-label]="
+                'Выбрать файл для загрузки. Сейчас: ' + (selectedFile()?.name ?? 'файл не выбран')
+              "
+            >
               <input
                 type="file"
                 class="file-picker-native"
@@ -37,7 +47,16 @@
               />
               <span class="file-picker-trigger">Обзор</span>
             </label>
-            <span class="file-picker-name u-muted">{{ selectedFile()?.name ?? 'Файл не выбран' }}</span>
+            <span class="file-picker-name u-muted" aria-hidden="true">{{
+              selectedFile()?.name ?? 'Файл не выбран'
+            }}</span>
+            <span class="sr-only" role="status" aria-live="polite">
+              @if (selectedFile(); as f) {
+                Выбран файл: {{ f.name }}
+              } @else {
+                Файл не выбран
+              }
+            </span>
           </div>
           <div class="files-actions">
             <button
@@ -61,17 +80,17 @@
       </div>
 
       @if (actionMessage()) {
-        <p class="u-alert u-alert-success">{{ actionMessage() }}</p>
+        <p class="u-alert u-alert-success" role="status" aria-live="polite">{{ actionMessage() }}</p>
       }
       @if (errorMessage()) {
-        <p class="u-alert u-alert-error">{{ errorMessage() }}</p>
+        <p class="u-alert u-alert-error" role="alert" aria-live="assertive">{{ errorMessage() }}</p>
       }
 
-      <div class="files-section">
+      <div class="files-section" [attr.aria-busy]="isLoading()">
         <div class="files-section-head">
           <h2 class="files-section-title">Ваши файлы</h2>
           @if (isLoading()) {
-            <span class="u-muted files-loading">Обновление…</span>
+            <span class="u-muted files-loading" role="status" aria-live="polite">Обновление…</span>
           }
         </div>
 
@@ -89,13 +108,25 @@
                     {{ file.content_type || 'application/octet-stream' }} ·
                     {{ file.created_at | date: 'short' }}
                   </span>
-                  <span class="u-muted files-tile-id">{{ file.blob_id }}</span>
+                  <span class="u-muted files-tile-id" [attr.title]="file.blob_id"
+                    >ID: {{ file.blob_id }}</span
+                  >
                 </div>
                 <div class="files-tile-actions">
-                  <button type="button" class="u-btn u-btn-ghost" (click)="downloadFile(file)">
+                  <button
+                    type="button"
+                    class="u-btn u-btn-ghost"
+                    [attr.aria-label]="'Скачать файл ' + (file.file_name || file.object_key)"
+                    (click)="downloadFile(file)"
+                  >
                     Скачать
                   </button>
-                  <button type="button" class="u-btn u-btn-danger" (click)="deleteFile(file)">
+                  <button
+                    type="button"
+                    class="u-btn u-btn-danger"
+                    [attr.aria-label]="'Удалить файл ' + (file.file_name || file.object_key)"
+                    (click)="deleteFile(file)"
+                  >
                     Удалить
                   </button>
                 </div>

@@ -7,10 +7,12 @@
 .auth-shell {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px 16px;
+  padding: calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+    calc(24px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
   box-sizing: border-box;
 }
 
@@ -63,6 +65,7 @@
 }
 
 .auth-title {
+  margin: 0;
   font-size: 20px;
   font-weight: 700;
   color: var(--text);
@@ -70,6 +73,7 @@
 }
 
 .auth-subtitle {
+  margin: 0;
   font-size: 14px;
   color: var(--muted);
 }
@@ -87,7 +91,8 @@
   flex: 1;
   border: none;
   background: transparent;
-  padding: 10px 12px;
+  padding: 12px 12px;
+  min-height: 44px;
   font-size: 14px;
   font-weight: 600;
   color: var(--muted);
@@ -97,6 +102,11 @@
   transition:
     background 0.15s ease,
     color 0.15s ease;
+}
+
+.auth-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
 }
 
 .auth-tab:hover {
@@ -115,13 +125,13 @@
   gap: 16px;
 }
 
-.auth-label {
+.auth-field {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.auth-label-text {
+.auth-label {
   font-size: 13px;
   font-weight: 600;
   color: #334155;
@@ -131,7 +141,7 @@
   width: 100%;
   box-sizing: border-box;
   padding: 14px 16px;
-  font-size: 15px;
+  font-size: 16px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #fafbfc;
@@ -153,7 +163,7 @@
   background: #fff;
 }
 
-.auth-input:focus {
+.auth-input:focus-visible {
   border-color: var(--primary);
   background: #fff;
   box-shadow: var(--focus);
@@ -204,10 +214,30 @@
   box-shadow: none;
 }
 
+.auth-submit:focus-visible {
+  outline: none;
+  box-shadow: var(--focus), 0 4px 14px rgba(38, 136, 235, 0.35);
+}
+
 .auth-hint {
   margin: 20px 0 0;
   font-size: 12px;
   line-height: 1.45;
   color: #94a3b8;
   text-align: center;
+}
+
+@media (max-width: 420px) {
+  .auth-card {
+    padding: 24px 20px 20px;
+    border-radius: var(--r-md);
+  }
+
+  .auth-brand {
+    margin-bottom: 22px;
+  }
+
+  .auth-title {
+    font-size: 18px;
+  }
 }

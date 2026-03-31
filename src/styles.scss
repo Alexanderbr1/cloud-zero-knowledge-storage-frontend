@@ -41,6 +41,10 @@
   --focus: 0 0 0 3px rgba(38, 136, 235, 0.2);
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 html,
 body {
   margin: 0;
@@ -72,6 +76,17 @@ a {
   font-size: 14px;
   font-family: inherit;
   cursor: pointer;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.u-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.u-btn:focus:not(:focus-visible) {
+  box-shadow: none;
 }
 
 .u-btn:disabled {
@@ -113,4 +128,16 @@ a {
   color: var(--error-text);
   background: var(--error-bg);
   border: 1px solid var(--error-border);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
