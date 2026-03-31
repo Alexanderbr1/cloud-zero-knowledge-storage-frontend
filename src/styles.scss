@@ -4,9 +4,85 @@
   box-sizing: border-box;
 }
 
+:root {
+  /* Typography */
+  --font-sans: 'Manrope', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Colors */
+  --bg: #e9eff6;
+  --surface: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+
+  --primary: #2688eb;
+  --primary-600: #1a77d4;
+  --danger: #ef4444;
+
+  /* Radius */
+  --r-sm: 10px;
+  --r-md: 12px;
+  --r-lg: 20px;
+
+  /* Shadows */
+  --shadow-1: 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --shadow-2: 0 24px 48px rgba(15, 23, 42, 0.12);
+  --shadow-3: 0 8px 16px rgba(15, 23, 42, 0.06);
+
+  /* Focus */
+  --focus: 0 0 0 3px rgba(38, 136, 235, 0.2);
+}
+
 html,
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #111827;
+  font-family: var(--font-sans);
+  color: var(--text);
+  background: var(--bg);
+}
+
+a {
+  color: inherit;
+}
+
+/* Minimal UI primitives (reused across components) */
+.u-muted {
+  color: var(--muted);
+}
+
+.u-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1), var(--shadow-2), var(--shadow-3);
+}
+
+.u-btn {
+  border: none;
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.u-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.u-btn-primary {
+  color: #fff;
+  background: linear-gradient(180deg, var(--primary) 0%, var(--primary-600) 100%);
+  box-shadow: 0 4px 14px rgba(38, 136, 235, 0.3);
+}
+
+.u-btn-ghost {
+  background: #eef2f7;
+  color: var(--text);
+}
+
+.u-btn-danger {
+  background: var(--danger);
+  color: #fff;
 }
