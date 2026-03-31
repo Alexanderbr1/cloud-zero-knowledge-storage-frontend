@@ -8,72 +8,94 @@
     (submitted)="submitAuth()"
   />
 } @else {
-  <main class="page">
-    <section class="card">
-      <header class="header">
-        <div class="header-row">
-          <div>
-            <h1>Cloud Files</h1>
-            <p>Загрузка, получение и удаление файлов в MinIO</p>
-          </div>
-          <button type="button" class="ghost-btn" (click)="logout()">Выйти</button>
+  <main class="files-shell">
+    <div class="files-backdrop" aria-hidden="true"></div>
+
+    <section class="files-card">
+      <header class="files-brand">
+        <div class="files-brand-mark" aria-hidden="true">C</div>
+        <div class="files-brand-text">
+          <h1 class="files-title">Cloud Files</h1>
+          <p class="files-subtitle">Файлы в облачном хранилище</p>
         </div>
+        <button type="button" class="u-btn u-btn-ghost files-logout" (click)="logout()">
+          Выйти
+        </button>
       </header>
 
-      <div class="upload-row">
-        <input type="file" (change)="onFileSelected($event)" />
-        <button
-          type="button"
-          class="primary-btn"
-          [disabled]="!selectedFile() || isUploading()"
-          (click)="uploadSelectedFile()"
-        >
-          {{ isUploading() ? 'Загрузка...' : 'Загрузить' }}
-        </button>
-        <button
-          type="button"
-          class="ghost-btn"
-          [disabled]="isLoading()"
-          (click)="refreshFiles()"
-        >
-          Обновить
-        </button>
+      <div class="files-panel">
+        <h2 class="files-panel-title">Загрузка</h2>
+        <p class="files-panel-h u-muted">Выберите файл и отправьте его в хранилище.</p>
+
+        <div class="files-toolbar">
+          <div class="file-picker">
+            <label class="file-picker-label">
+              <input
+                type="file"
+                class="file-picker-native"
+                (change)="onFileSelected($event)"
+              />
+              <span class="file-picker-trigger">Обзор</span>
+            </label>
+            <span class="file-picker-name u-muted">{{ selectedFile()?.name ?? 'Файл не выбран' }}</span>
+          </div>
+          <div class="files-actions">
+            <button
+              type="button"
+              class="u-btn u-btn-primary"
+              [disabled]="!selectedFile() || isUploading()"
+              (click)="uploadSelectedFile()"
+            >
+              {{ isUploading() ? 'Загрузка…' : 'Загрузить' }}
+            </button>
+            <button
+              type="button"
+              class="u-btn u-btn-ghost"
+              [disabled]="isLoading()"
+              (click)="refreshFiles()"
+            >
+              Обновить список
+            </button>
+          </div>
+        </div>
       </div>
 
       @if (actionMessage()) {
-        <p class="message success">{{ actionMessage() }}</p>
+        <p class="u-alert u-alert-success">{{ actionMessage() }}</p>
       }
       @if (errorMessage()) {
-        <p class="message error">{{ errorMessage() }}</p>
+        <p class="u-alert u-alert-error">{{ errorMessage() }}</p>
       }
 
-      <div class="files">
-        <div class="files-head">
-          <h2>Файлы</h2>
+      <div class="files-section">
+        <div class="files-section-head">
+          <h2 class="files-section-title">Ваши файлы</h2>
           @if (isLoading()) {
-            <span class="muted">Загрузка списка...</span>
+            <span class="u-muted files-loading">Обновление…</span>
           }
         </div>
 
         @if (files().length === 0 && !isLoading()) {
-          <p class="muted">Пока нет загруженных файлов.</p>
+          <div class="files-empty u-muted">
+            Пока нет файлов — загрузите первый.
+          </div>
         } @else {
-          <ul class="files-list">
+          <ul class="files-grid" role="list">
             @for (file of files(); track trackByFileName($index, file)) {
-              <li class="file-item">
-                <div class="file-meta">
-                  <strong>{{ file.file_name || file.object_key }}</strong>
-                  <span class="muted">blob_id: {{ file.blob_id }}</span>
-                  <span class="muted">
+              <li class="files-tile" role="listitem">
+                <div class="files-tile-main">
+                  <span class="files-tile-name">{{ file.file_name || file.object_key }}</span>
+                  <span class="u-muted files-tile-meta">
                     {{ file.content_type || 'application/octet-stream' }} ·
                     {{ file.created_at | date: 'short' }}
                   </span>
+                  <span class="u-muted files-tile-id">{{ file.blob_id }}</span>
                 </div>
-                <div class="actions">
-                  <button type="button" class="ghost-btn" (click)="downloadFile(file)">
+                <div class="files-tile-actions">
+                  <button type="button" class="u-btn u-btn-ghost" (click)="downloadFile(file)">
                     Скачать
                   </button>
-                  <button type="button" class="danger-btn" (click)="deleteFile(file)">
+                  <button type="button" class="u-btn u-btn-danger" (click)="deleteFile(file)">
                     Удалить
                   </button>
                 </div>

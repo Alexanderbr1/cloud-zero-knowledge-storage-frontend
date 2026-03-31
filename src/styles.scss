@@ -19,6 +19,14 @@
   --primary-600: #1a77d4;
   --danger: #ef4444;
 
+  --success-bg: #dcfce7;
+  --success-text: #166534;
+  --success-border: #bbf7d0;
+  --error-bg: #fef2f2;
+  --error-text: #b91c1c;
+  --error-border: #fecaca;
+  --surface-soft: #fafbfc;
+
   /* Radius */
   --r-sm: 10px;
   --r-md: 12px;
@@ -85,4 +93,24 @@ a {
 .u-btn-danger {
   background: var(--danger);
   color: #fff;
+}
+
+.u-alert {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.u-alert-success {
+  color: var(--success-text);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+}
+
+.u-alert-error {
+  color: var(--error-text);
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
 }
