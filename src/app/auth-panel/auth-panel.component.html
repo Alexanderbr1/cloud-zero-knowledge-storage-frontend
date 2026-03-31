@@ -1,0 +1,78 @@
+<div class="auth-shell">
+  <div class="auth-backdrop" aria-hidden="true"></div>
+
+  <div class="auth-card" role="dialog" aria-labelledby="auth-title" aria-describedby="auth-subtitle">
+    <div class="auth-brand">
+      <div class="auth-logo" aria-hidden="true">C</div>
+      <div class="auth-brand-text">
+        <span id="auth-title" class="auth-title">Cloud Files</span>
+        <span id="auth-subtitle" class="auth-subtitle">Вход и регистрация</span>
+      </div>
+    </div>
+
+    <div class="auth-tabs" role="tablist">
+      <button
+        type="button"
+        class="auth-tab"
+        role="tab"
+        [attr.aria-selected]="mode() === 'login'"
+        [class.auth-tab-active]="mode() === 'login'"
+        (click)="selectMode('login')"
+      >
+        Вход
+      </button>
+      <button
+        type="button"
+        class="auth-tab"
+        role="tab"
+        [attr.aria-selected]="mode() === 'register'"
+        [class.auth-tab-active]="mode() === 'register'"
+        (click)="selectMode('register')"
+      >
+        Регистрация
+      </button>
+    </div>
+
+    <form class="auth-form" [formGroup]="credentialsForm()" (ngSubmit)="onSubmit()">
+      <label class="auth-label">
+        <span class="auth-label-text">Телефон или почта</span>
+        <input
+          class="auth-input"
+          type="email"
+          autocomplete="username"
+          formControlName="email"
+          placeholder="email@example.com"
+        />
+      </label>
+
+      <label class="auth-label">
+        <span class="auth-label-text">Пароль</span>
+        <input
+          class="auth-input"
+          type="password"
+          autocomplete="current-password"
+          formControlName="password"
+          placeholder="Минимум 8 символов при регистрации"
+        />
+      </label>
+
+      @if (errorText()) {
+        <p class="auth-error" role="alert">{{ errorText() }}</p>
+      }
+
+      <button type="submit" class="auth-submit" [disabled]="isSubmitting() || credentialsForm().invalid">
+        {{
+          isSubmitting()
+            ? mode() === 'register'
+              ? 'Создаём аккаунт…'
+              : 'Входим…'
+            : mode() === 'register'
+              ? 'Продолжить'
+              : 'Войти'
+        }}
+      </button>
+    </form>
+
+    <p class="auth-hint">Нажимая кнопку, вы принимаете условия сервиса (демо).</p>
+  </div>
+</div>

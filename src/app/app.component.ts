@@ -6,11 +6,12 @@ import { finalize } from 'rxjs';
 import { FileItem } from './core/models/file-item.model';
 import { AuthService } from './core/services/auth.service';
 import { FilesService } from './core/services/files.service';
+import { AuthPanelComponent } from './auth-panel/auth-panel.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, AuthPanelComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
@@ -18,6 +19,7 @@ export class AppComponent {
   private readonly filesService = inject(FilesService);
   private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
+  private readonly registerPasswordMinLenValidator = Validators.minLength(8);
 
   readonly files = signal<FileItem[]>([]);
   readonly selectedFile = signal<File | null>(null);
@@ -45,6 +47,13 @@ export class AppComponent {
     this.authMode.set(mode);
     this.actionMessage.set('');
     this.errorMessage.set('');
+    const pass = this.loginForm.controls.password;
+    if (mode === 'register') {
+      pass.addValidators(this.registerPasswordMinLenValidator);
+    } else {
+      pass.removeValidators(this.registerPasswordMinLenValidator);
+    }
+    pass.updateValueAndValidity();
   }
 
   submitAuth(): void {

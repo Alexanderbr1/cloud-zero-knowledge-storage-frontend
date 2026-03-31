@@ -18,12 +18,11 @@
   box-shadow: 0 8px 30px rgba(17, 24, 39, 0.08);
 }
 
-.header h1 {
-  margin: 0;
+.header .header-row h1 {
   font-size: 26px;
 }
 
-.header p {
+.header .header-row p {
   margin: 8px 0 24px;
   color: #4b5563;
 }
@@ -35,43 +34,19 @@
   flex-wrap: wrap;
 }
 
-.auth-row {
+.header-row {
   display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
 }
 
-.auth-form {
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  flex: 1;
+.header-row h1 {
+  margin: 0;
 }
 
-.auth-toggle {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.auth-toggle .ghost-btn.active {
-  background: #111827;
-  color: #fff;
-}
-
-.auth-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-  min-width: 220px;
-}
-
-.auth-status {
-  flex: 1;
+.header-row p {
+  margin: 8px 0 24px;
 }
 
 button {
