@@ -1,6 +1,6 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { catchError, finalize, Observable, shareReplay, switchMap, throwError } from 'rxjs';
+import { catchError, finalize, Observable, share, switchMap, throwError } from 'rxjs';
 
 import { AuthService } from '../services/auth.service';
 
@@ -27,15 +27,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => err);
       }
 
-      const refreshToken = auth.refreshToken();
-      if (!refreshToken) {
-        auth.logout();
-        return throwError(() => err);
-      }
-
       if (!refreshInFlight$) {
-        refreshInFlight$ = auth.refresh().pipe(
-          shareReplay({ bufferSize: 1, refCount: false }),
+        refreshInFlight$ = auth.refreshSession().pipe(
+          share({
+            resetOnError: true,
+            resetOnComplete: true,
+          }),
           finalize(() => {
             refreshInFlight$ = null;
           })
@@ -49,7 +46,11 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
             auth.logout();
             return throwError(() => err);
           }
-          return next(req.clone({ setHeaders: { Authorization: `Bearer ${newToken}` } }));
+          return next(
+            req.clone({
+              setHeaders: { Authorization: `Bearer ${newToken}` },
+            })
+          );
         }),
         catchError((e) => {
           auth.logout();
@@ -59,4 +60,3 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     })
   );
 };
-
