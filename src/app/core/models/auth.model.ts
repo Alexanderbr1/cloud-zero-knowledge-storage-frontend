@@ -14,4 +14,10 @@ export interface LoginRequestDto {
 export interface RegisterRequestDto {
   email: string;
   password: string;
+  crypto_salt: string; // base64-encoded 16 байт, сгенерированных на клиенте
+}
+
+/** GET /auth/crypto-params?email=... */
+export interface CryptoParamsResponseDto {
+  crypto_salt: string; // base64-encoded 16 байт
 }

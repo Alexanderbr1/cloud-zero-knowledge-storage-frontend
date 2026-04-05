@@ -1,9 +1,10 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { finalize, map, Observable, take, tap } from 'rxjs';
+import { finalize, from, map, Observable, switchMap, take, tap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import type { LoginRequestDto, RegisterRequestDto, TokenResponseDto } from '../models/auth.model';
+import type { LoginRequestDto, RegisterRequestDto, TokenResponseDto, CryptoParamsResponseDto } from '../models/auth.model';
+import { CryptoService } from './crypto.service';
 
 const LS_ACCESS = 'auth.access_token';
 /** Старый формат: refresh в localStorage; больше не используется. */
@@ -12,8 +13,15 @@ const LEGACY_LS_REFRESH = 'auth.refresh_token';
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
+  private readonly crypto = inject(CryptoService);
   private readonly baseUrl = `${environment.apiBaseUrl}/auth`;
   private readonly accessTokenSig = signal<string | null>(this.readAccessToken());
+
+  /**
+   * Мастер-ключ живёт только в памяти — никогда в localStorage/sessionStorage.
+   * Производится из пароля через PBKDF2. Обнуляется при logout.
+   */
+  private masterKey: CryptoKey | null = null;
 
   constructor() {
     try {
@@ -29,24 +37,60 @@ export class AuthService {
     return this.accessTokenSig();
   }
 
-  login(email: string, password: string): Observable<void> {
-    const payload: LoginRequestDto = { email, password };
-    return this.http.post<TokenResponseDto>(`${this.baseUrl}/login`, payload).pipe(
-      tap((t) => this.setAccessToken(t.access_token)),
-      map(() => void 0)
-    );
+  getMasterKey(): CryptoKey | null {
+    return this.masterKey;
   }
 
+  /**
+   * Регистрация:
+   * 1. Генерируем crypto_salt на клиенте
+   * 2. Деривируем мастер-ключ локально (PBKDF2)
+   * 3. Отправляем email + password + crypto_salt на сервер
+   */
   register(email: string, password: string): Observable<void> {
-    const payload: RegisterRequestDto = { email, password };
-    return this.http.post<TokenResponseDto>(`${this.baseUrl}/register`, payload).pipe(
+    const salt = this.crypto.generateSalt();
+    const saltB64 = this.crypto.toBase64(salt);
+
+    return from(this.crypto.deriveMasterKey(password, salt)).pipe(
+      switchMap((masterKey) => {
+        this.masterKey = masterKey;
+        const payload: RegisterRequestDto = { email, password, crypto_salt: saltB64 };
+        return this.http.post<TokenResponseDto>(`${this.baseUrl}/register`, payload);
+      }),
       tap((t) => this.setAccessToken(t.access_token)),
       map(() => void 0)
     );
   }
 
   /**
+   * Логин:
+   * 1. Запрашиваем crypto_salt у сервера (публичный endpoint)
+   * 2. Деривируем мастер-ключ локально (PBKDF2)
+   * 3. Отправляем email + password на сервер для аутентификации
+   */
+  login(email: string, password: string): Observable<void> {
+    return this.http
+      .get<CryptoParamsResponseDto>(`${this.baseUrl}/crypto-params`, {
+        params: { email }
+      })
+      .pipe(
+        switchMap((params) => {
+          const salt = new Uint8Array(this.crypto.fromBase64(params.crypto_salt));
+          return from(this.crypto.deriveMasterKey(password, salt));
+        }),
+        switchMap((masterKey) => {
+          this.masterKey = masterKey;
+          const payload: LoginRequestDto = { email, password };
+          return this.http.post<TokenResponseDto>(`${this.baseUrl}/login`, payload);
+        }),
+        tap((t) => this.setAccessToken(t.access_token)),
+        map(() => void 0)
+      );
+  }
+
+  /**
    * Новая пара токенов: refresh читается с сервера из HttpOnly-куки (тело не нужно).
+   * Мастер-ключ НЕ переинициализируется при refresh — он уже в памяти из login/register.
    */
   refreshSession(): Observable<void> {
     return this.http.post<TokenResponseDto>(`${this.baseUrl}/refresh`, {}).pipe(
@@ -56,14 +100,17 @@ export class AuthService {
   }
 
   /**
-   * Отзыв refresh на сервере + очистка HttpOnly-куки; локально убираем access.
+   * Отзыв refresh на сервере + очистка HttpOnly-куки; локально убираем access и мастер-ключ.
    */
   logout(): void {
     this.http
       .post<void>(`${this.baseUrl}/logout`, {})
       .pipe(
         take(1),
-        finalize(() => this.clearAccess())
+        finalize(() => {
+          this.masterKey = null;
+          this.clearAccess();
+        })
       )
       .subscribe();
   }

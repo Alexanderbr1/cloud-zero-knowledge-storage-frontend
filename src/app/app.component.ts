@@ -138,12 +138,12 @@ export class AppComponent {
     this.errorMessage.set('');
     this.actionMessage.set('');
 
-    this.filesService.getDownloadUrl(file.blob_id).subscribe({
-      next: (downloadUrl) => {
-        window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+    this.filesService.downloadFile(file.blob_id, file.file_name).subscribe({
+      next: () => {
+        this.actionMessage.set(`Файл "${file.file_name}" скачан.`);
       },
       error: () => {
-        this.errorMessage.set(`Не удалось получить ссылку для "${file.object_key}".`);
+        this.errorMessage.set(`Не удалось скачать "${file.file_name}".`);
       }
     });
   }
@@ -158,11 +158,11 @@ export class AppComponent {
 
     this.filesService.deleteFile(file.blob_id).subscribe({
       next: () => {
-        this.actionMessage.set(`Файл "${file.object_key}" удален.`);
+        this.actionMessage.set(`Файл "${file.file_name}" удален.`);
         this.refreshFiles();
       },
       error: () => {
-        this.errorMessage.set(`Не удалось удалить "${file.object_key}".`);
+        this.errorMessage.set(`Не удалось удалить "${file.file_name}".`);
       }
     });
   }

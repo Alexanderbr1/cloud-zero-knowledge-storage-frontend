@@ -4,4 +4,6 @@ export interface FileItem {
   object_key: string;
   content_type?: string;
   created_at: string;
+  encrypted_file_key: string;
+  file_iv: string;
 }
