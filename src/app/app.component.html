@@ -100,7 +100,7 @@
           </div>
         } @else {
           <ul class="files-grid" role="list">
-            @for (file of files(); track trackByFileName($index, file)) {
+            @for (file of files(); track file.blob_id) {
               <li class="files-tile" role="listitem">
                 <div class="files-tile-main">
                   <span class="files-tile-name">{{ file.file_name || file.object_key }}</span>

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { from, map, Observable, switchMap } from 'rxjs';
 
@@ -38,9 +38,8 @@ interface ListBlobsResponse {
   providedIn: 'root'
 })
 export class FilesService {
+  private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiBaseUrl}/storage`;
-
-  constructor(private readonly http: HttpClient) {}
 
   listFiles(): Observable<FileItem[]> {
     return this.http

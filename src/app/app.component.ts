@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
@@ -11,7 +11,7 @@ import { AuthPanelComponent } from './auth-panel/auth-panel.component';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, AuthPanelComponent],
+  imports: [DatePipe, ReactiveFormsModule, AuthPanelComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
@@ -165,10 +165,6 @@ export class AppComponent {
         this.errorMessage.set(`Не удалось удалить "${file.object_key}".`);
       }
     });
-  }
-
-  trackByFileName(_: number, item: FileItem): string {
-    return item.blob_id;
   }
 
   refreshFiles(): void {
