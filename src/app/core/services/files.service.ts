@@ -9,6 +9,7 @@ import { AuthService } from './auth.service';
 
 interface PresignPutRequest {
   file_name: string;
+  content_type: string;
   encrypted_file_key: string;
   file_iv: string;
 }
@@ -18,6 +19,7 @@ interface PresignPutResponse {
   upload_url: string;
   expires_in: number;
   http_method: string;
+  content_type: string;
   instructions: string;
 }
 
@@ -26,6 +28,7 @@ interface PresignGetResponse {
   download_url: string;
   expires_in: number;
   http_method: string;
+  content_type: string;
   encrypted_file_key: string;
   file_iv: string;
 }
@@ -64,8 +67,10 @@ export class FilesService {
 
     return from(this.prepareEncryptedUpload(file, masterKey)).pipe(
       switchMap(({ encryptedBuffer, wrappedKeyB64, ivB64 }) => {
+        const contentType = file.type?.trim() || 'application/octet-stream';
         const payload: PresignPutRequest = {
           file_name: file.name,
+          content_type: contentType,
           encrypted_file_key: wrappedKeyB64,
           file_iv: ivB64
         };
@@ -75,7 +80,7 @@ export class FilesService {
             from(
               fetch(presign.upload_url, {
                 method: presign.http_method || 'PUT',
-                headers: { 'Content-Type': 'application/octet-stream' },
+                headers: { 'Content-Type': presign.content_type || contentType },
                 body: encryptedBuffer
               })
             ).pipe(
@@ -146,11 +151,11 @@ export class FilesService {
     const fileKey = await this.crypto.unwrapFileKey(resp.encrypted_file_key, masterKey);
     const plaintext = await this.crypto.decryptFile(encryptedData, fileKey, resp.file_iv);
 
-    this.triggerBrowserDownload(plaintext, fileName);
+    this.triggerBrowserDownload(plaintext, fileName, resp.content_type);
   }
 
-  private triggerBrowserDownload(data: ArrayBuffer, fileName: string): void {
-    const blob = new Blob([data]);
+  private triggerBrowserDownload(data: ArrayBuffer, fileName: string, contentType: string): void {
+    const blob = new Blob([data], { type: contentType || 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

@@ -105,7 +105,7 @@
                 <div class="files-tile-main">
                   <span class="files-tile-name">{{ file.file_name || file.object_key }}</span>
                   <span class="u-muted files-tile-meta">
-                    {{ file.content_type || 'application/octet-stream' }} ·
+                    {{ file.content_type }} ·
                     {{ file.created_at | date: 'short' }}
                   </span>
                   <span class="u-muted files-tile-id" [attr.title]="file.blob_id"
