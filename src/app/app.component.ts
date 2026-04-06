@@ -1,4 +1,5 @@
 import { DatePipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
@@ -78,12 +79,20 @@ export class AppComponent {
         this.loginForm.controls.password.setValue('');
         this.refreshFiles();
       },
-      error: () => {
-        this.errorMessage.set(
-          this.authMode() === 'register'
-            ? 'Не удалось зарегистрироваться (возможно, пользователь уже существует).'
-            : 'Не удалось войти (проверьте email/пароль).'
-        );
+      error: (err: unknown) => {
+        if (err instanceof HttpErrorResponse) {
+          this.errorMessage.set(
+            this.authMode() === 'register'
+              ? 'Не удалось зарегистрироваться (возможно, пользователь уже существует).'
+              : 'Не удалось войти (проверьте email/пароль).'
+          );
+          return;
+        }
+        if (err instanceof Error && err.message) {
+          this.errorMessage.set(err.message);
+          return;
+        }
+        this.errorMessage.set('Произошла ошибка. Попробуйте снова.');
       }
     });
   }

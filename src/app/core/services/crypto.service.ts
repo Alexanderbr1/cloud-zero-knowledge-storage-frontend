@@ -12,7 +12,30 @@ import { Injectable } from '@angular/core';
  */
 @Injectable({ providedIn: 'root' })
 export class CryptoService {
-  private readonly subtle = window.crypto.subtle;
+  /**
+   * Web Crypto `subtle` есть только в «безопасном контексте» (HTTPS или http://localhost).
+   * На http://192.168.x.x и аналогах регистрация/шифрование не работают — до запроса на сервер.
+   */
+  webCryptoBlockedMessage(): string | null {
+    if (typeof globalThis === 'undefined' || !globalThis.crypto) {
+      return 'В этом окружении нет Web Crypto API. Откройте приложение в современном браузере.';
+    }
+    if (!globalThis.crypto.subtle) {
+      return (
+        'Шифрование недоступно: нужен безопасный контекст (HTTPS или http://localhost). ' +
+        'Не открывайте приложение по IP в локальной сети по HTTP — используйте localhost, ng serve --host localhost или HTTPS.'
+      );
+    }
+    return null;
+  }
+
+  private requireSubtle(): SubtleCrypto {
+    const msg = this.webCryptoBlockedMessage();
+    if (msg) {
+      throw new Error(msg);
+    }
+    return globalThis.crypto.subtle;
+  }
 
   // ─── Утилиты base64 ──────────────────────────────────────────────────────
 
@@ -38,7 +61,10 @@ export class CryptoService {
 
   /** Генерирует случайные 16 байт соли для PBKDF2. */
   generateSalt(): Uint8Array {
-    return window.crypto.getRandomValues(new Uint8Array(16));
+    if (!globalThis.crypto?.getRandomValues) {
+      throw new Error(this.webCryptoBlockedMessage() ?? 'Web Crypto недоступен.');
+    }
+    return globalThis.crypto.getRandomValues(new Uint8Array(16));
   }
 
   // ─── Деривация мастер-ключа ──────────────────────────────────────────────
@@ -48,9 +74,10 @@ export class CryptoService {
    * Результат — non-extractable AES-KW ключ (только для wrap/unwrap файловых ключей).
    */
   async deriveMasterKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+    const subtle = this.requireSubtle();
     const enc = new TextEncoder();
 
-    const passwordKey = await this.subtle.importKey(
+    const passwordKey = await subtle.importKey(
       'raw',
       enc.encode(password),
       'PBKDF2',
@@ -58,7 +85,7 @@ export class CryptoService {
       ['deriveKey']
     );
 
-    return this.subtle.deriveKey(
+    return subtle.deriveKey(
       {
         name: 'PBKDF2',
         salt,
@@ -76,7 +103,8 @@ export class CryptoService {
 
   /** Генерирует уникальный AES-256-GCM ключ для каждого файла. */
   async generateFileKey(): Promise<CryptoKey> {
-    return this.subtle.generateKey(
+    const subtle = this.requireSubtle();
+    return subtle.generateKey(
       { name: 'AES-GCM', length: 256 },
       true, // extractable — нужен для wrapKey
       ['encrypt', 'decrypt']
@@ -88,7 +116,8 @@ export class CryptoService {
    * Возвращает base64-строку для хранения на сервере.
    */
   async wrapFileKey(fileKey: CryptoKey, masterKey: CryptoKey): Promise<string> {
-    const wrapped = await this.subtle.wrapKey('raw', fileKey, masterKey, 'AES-KW');
+    const subtle = this.requireSubtle();
+    const wrapped = await subtle.wrapKey('raw', fileKey, masterKey, 'AES-KW');
     return this.toBase64(wrapped);
   }
 
@@ -97,8 +126,9 @@ export class CryptoService {
    * Результат — non-extractable AES-GCM ключ.
    */
   async unwrapFileKey(wrappedKeyB64: string, masterKey: CryptoKey): Promise<CryptoKey> {
+    const subtle = this.requireSubtle();
     const wrappedKey = this.fromBase64(wrappedKeyB64);
-    return this.subtle.unwrapKey(
+    return subtle.unwrapKey(
       'raw',
       wrappedKey,
       masterKey,
@@ -120,9 +150,10 @@ export class CryptoService {
     data: ArrayBuffer,
     fileKey: CryptoKey
   ): Promise<{ ciphertext: ArrayBuffer; ivB64: string }> {
-    const iv = window.crypto.getRandomValues(new Uint8Array(12)); // 96 бит (NIST SP 800-38D)
+    const subtle = this.requireSubtle();
+    const iv = globalThis.crypto.getRandomValues(new Uint8Array(12)); // 96 бит (NIST SP 800-38D)
 
-    const ciphertext = await this.subtle.encrypt(
+    const ciphertext = await subtle.encrypt(
       { name: 'AES-GCM', iv },
       fileKey,
       data
@@ -140,9 +171,10 @@ export class CryptoService {
     fileKey: CryptoKey,
     ivB64: string
   ): Promise<ArrayBuffer> {
+    const subtle = this.requireSubtle();
     const iv = this.fromBase64(ivB64);
 
-    return this.subtle.decrypt(
+    return subtle.decrypt(
       { name: 'AES-GCM', iv },
       fileKey,
       ciphertext

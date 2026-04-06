@@ -48,6 +48,10 @@ export class AuthService {
    * 3. Отправляем email + password + crypto_salt на сервер
    */
   register(email: string, password: string): Observable<void> {
+    const blocked = this.crypto.webCryptoBlockedMessage();
+    if (blocked) {
+      return throwError(() => new Error(blocked));
+    }
     const salt = this.crypto.generateSalt();
     const saltB64 = this.crypto.toBase64(salt);
 
@@ -68,6 +72,10 @@ export class AuthService {
    * 2. Деривируем мастер-ключ локально (PBKDF2) и сохраняем access
    */
   login(email: string, password: string): Observable<void> {
+    const blocked = this.crypto.webCryptoBlockedMessage();
+    if (blocked) {
+      return throwError(() => new Error(blocked));
+    }
     const payload: LoginRequestDto = { email, password };
     return this.http.post<TokenResponseDto>(`${this.baseUrl}/login`, payload).pipe(
       switchMap((t) => {
