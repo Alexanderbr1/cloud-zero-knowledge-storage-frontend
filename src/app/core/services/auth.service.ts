@@ -1,9 +1,9 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { finalize, from, map, Observable, switchMap, take, tap } from 'rxjs';
+import { finalize, from, map, Observable, switchMap, take, tap, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import type { LoginRequestDto, RegisterRequestDto, TokenResponseDto, CryptoParamsResponseDto } from '../models/auth.model';
+import type { LoginRequestDto, RegisterRequestDto, TokenResponseDto } from '../models/auth.model';
 import { CryptoService } from './crypto.service';
 
 const LS_ACCESS = 'auth.access_token';
@@ -64,28 +64,28 @@ export class AuthService {
 
   /**
    * Логин:
-   * 1. Запрашиваем crypto_salt у сервера (публичный endpoint)
-   * 2. Деривируем мастер-ключ локально (PBKDF2)
-   * 3. Отправляем email + password на сервер для аутентификации
+   * 1. POST email + password — после успеха в ответе приходит crypto_salt
+   * 2. Деривируем мастер-ключ локально (PBKDF2) и сохраняем access
    */
   login(email: string, password: string): Observable<void> {
-    return this.http
-      .get<CryptoParamsResponseDto>(`${this.baseUrl}/crypto-params`, {
-        params: { email }
-      })
-      .pipe(
-        switchMap((params) => {
-          const salt = new Uint8Array(this.crypto.fromBase64(params.crypto_salt));
-          return from(this.crypto.deriveMasterKey(password, salt));
-        }),
-        switchMap((masterKey) => {
-          this.masterKey = masterKey;
-          const payload: LoginRequestDto = { email, password };
-          return this.http.post<TokenResponseDto>(`${this.baseUrl}/login`, payload);
-        }),
-        tap((t) => this.setAccessToken(t.access_token)),
-        map(() => void 0)
-      );
+    const payload: LoginRequestDto = { email, password };
+    return this.http.post<TokenResponseDto>(`${this.baseUrl}/login`, payload).pipe(
+      switchMap((t) => {
+        const saltB64 = t.crypto_salt?.trim();
+        if (!saltB64) {
+          return throwError(() => new Error('login response missing crypto_salt'));
+        }
+        const salt = new Uint8Array(this.crypto.fromBase64(saltB64));
+        return from(this.crypto.deriveMasterKey(password, salt)).pipe(
+          map((masterKey) => ({ t, masterKey }))
+        );
+      }),
+      tap(({ t, masterKey }) => {
+        this.masterKey = masterKey;
+        this.setAccessToken(t.access_token);
+      }),
+      map(() => void 0)
+    );
   }
 
   /**
