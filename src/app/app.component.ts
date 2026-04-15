@@ -133,7 +133,12 @@ export class AppComponent {
           this.selectedFile.set(null);
           this.refreshFiles();
         },
-        error: () => {
+        error: (err: unknown) => {
+          if (this.isMasterKeyMissing(err)) {
+            this.auth.clearAccess();
+            this.errorMessage.set('Сессия истекла — войдите заново.');
+            return;
+          }
           this.errorMessage.set('Не удалось загрузить файл.');
         }
       });
@@ -151,7 +156,12 @@ export class AppComponent {
       next: () => {
         this.actionMessage.set(`Файл "${file.file_name}" скачан.`);
       },
-      error: () => {
+      error: (err: unknown) => {
+        if (this.isMasterKeyMissing(err)) {
+          this.auth.clearAccess();
+          this.errorMessage.set('Сессия истекла — войдите заново.');
+          return;
+        }
         this.errorMessage.set(`Не удалось скачать "${file.file_name}".`);
       }
     });
@@ -174,6 +184,10 @@ export class AppComponent {
         this.errorMessage.set(`Не удалось удалить "${file.file_name}".`);
       }
     });
+  }
+
+  private isMasterKeyMissing(err: unknown): boolean {
+    return err instanceof Error && err.message.startsWith('Master key');
   }
 
   refreshFiles(): void {

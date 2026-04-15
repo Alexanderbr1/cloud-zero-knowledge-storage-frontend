@@ -39,8 +39,8 @@ export class CryptoService {
 
   // ─── Утилиты base64 ──────────────────────────────────────────────────────
 
-  toBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
+  toBase64(source: ArrayBuffer | Uint8Array): string {
+    const bytes = source instanceof Uint8Array ? source : new Uint8Array(source);
     let binary = '';
     for (let i = 0; i < bytes.byteLength; i++) {
       binary += String.fromCharCode(bytes[i]);
@@ -59,12 +59,12 @@ export class CryptoService {
 
   // ─── Генерация соли ──────────────────────────────────────────────────────
 
-  /** Генерирует случайные 16 байт соли для PBKDF2. */
+  /** Генерирует случайные 32 байта соли для PBKDF2. */
   generateSalt(): Uint8Array {
     if (!globalThis.crypto?.getRandomValues) {
       throw new Error(this.webCryptoBlockedMessage() ?? 'Web Crypto недоступен.');
     }
-    return globalThis.crypto.getRandomValues(new Uint8Array(16));
+    return globalThis.crypto.getRandomValues(new Uint8Array(32));
   }
 
   // ─── Деривация мастер-ключа ──────────────────────────────────────────────
@@ -85,10 +85,15 @@ export class CryptoService {
       ['deriveKey']
     );
 
+    // Копируем байты в явный ArrayBuffer — гарантирует совместимость с Web Crypto API
+    // в любой версии TypeScript (начиная с 5.4) без SharedArrayBuffer-неоднозначности.
+    const saltBuf = new ArrayBuffer(salt.byteLength);
+    new Uint8Array(saltBuf).set(salt);
+
     return subtle.deriveKey(
       {
         name: 'PBKDF2',
-        salt,
+        salt: saltBuf,
         iterations: 310_000,
         hash: 'SHA-256'
       },

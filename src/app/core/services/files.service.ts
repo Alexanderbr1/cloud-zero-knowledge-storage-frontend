@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { from, map, Observable, switchMap } from 'rxjs';
+import { from, map, Observable, switchMap, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { FileItem } from '../models/file-item.model';
@@ -62,7 +62,7 @@ export class FilesService {
   uploadFile(file: File): Observable<PresignPutResponse> {
     const masterKey = this.auth.getMasterKey();
     if (!masterKey) {
-      throw new Error('Master key not available. Please log in again.');
+      return throwError(() => new Error('Master key not available. Please log in again.'));
     }
 
     return from(this.prepareEncryptedUpload(file, masterKey)).pipe(

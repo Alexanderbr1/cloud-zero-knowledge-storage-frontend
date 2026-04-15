@@ -57,11 +57,14 @@ export class AuthService {
 
     return from(this.crypto.deriveMasterKey(password, salt)).pipe(
       switchMap((masterKey) => {
-        this.masterKey = masterKey;
         const payload: RegisterRequestDto = { email, password, crypto_salt: saltB64 };
-        return this.http.post<TokenResponseDto>(`${this.baseUrl}/register`, payload);
+        return this.http.post<TokenResponseDto>(`${this.baseUrl}/register`, payload).pipe(
+          tap((t) => {
+            this.masterKey = masterKey;
+            this.setAccessToken(t.access_token);
+          })
+        );
       }),
-      tap((t) => this.setAccessToken(t.access_token)),
       map(() => void 0)
     );
   }
@@ -77,6 +80,7 @@ export class AuthService {
       return throwError(() => new Error(blocked));
     }
     const payload: LoginRequestDto = { email, password };
+
     return this.http.post<TokenResponseDto>(`${this.baseUrl}/login`, payload).pipe(
       switchMap((t) => {
         const saltB64 = t.crypto_salt?.trim();
