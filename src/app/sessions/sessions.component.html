@@ -1,0 +1,78 @@
+<div class="sessions-card card">
+  <!-- Card header -->
+  <div class="sessions-header">
+    <span class="text-sm text-secondary">
+      @if (isLoading()) { Загрузка… }
+      @else { {{ sessions().length }} {{ pluralSessions(sessions().length) }} }
+    </span>
+    @if (sessions().length > 1) {
+      <button
+        type="button"
+        class="btn btn--ghost btn--sm"
+        [disabled]="revoking() !== null"
+        (click)="revokeOthers()"
+      >
+        {{ revoking() === 'others' ? 'Завершение…' : 'Завершить другие' }}
+      </button>
+    }
+  </div>
+  <hr class="divider">
+
+  @if (errorMessage()) {
+    <div class="alert alert--error sessions-alert" role="alert">{{ errorMessage() }}</div>
+  }
+
+  @if (isLoading()) {
+    <div class="sessions-empty">
+      <span class="text-muted text-sm">Загрузка сессий…</span>
+    </div>
+  } @else if (sessions().length === 0) {
+    <div class="sessions-empty">
+      <span class="text-muted text-sm">Нет активных сессий.</span>
+    </div>
+  } @else {
+    <ul class="sessions-list" role="list">
+      @for (session of sessions(); track session.id) {
+        <li class="session-row" [class.session-row--current]="session.is_current">
+          <!-- Device icon -->
+          <div class="session-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <rect x="1" y="3" width="16" height="11" rx="2" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M6 14v1.5M12 14v1.5M4.5 15.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+          </div>
+
+          <!-- Session info -->
+          <div class="session-info">
+            <div class="session-name">
+              {{ session.device_name || 'Неизвестное устройство' }}
+              @if (session.is_current) {
+                <span class="badge badge--success">Текущая</span>
+              }
+            </div>
+            <div class="session-meta text-sm text-secondary">
+              <span>{{ session.ip_address || '—' }}</span>
+              <span class="session-meta__dot" aria-hidden="true">·</span>
+              <span>Активна {{ formatRelative(session.last_active_at) }}</span>
+            </div>
+          </div>
+
+          <!-- Terminate button -->
+          <div class="session-action">
+            @if (!session.is_current) {
+              <button
+                type="button"
+                class="btn btn--danger btn--sm"
+                [disabled]="revoking() !== null"
+                [attr.aria-label]="'Завершить сессию ' + session.device_name"
+                (click)="revokeSession(session)"
+              >
+                {{ revoking() === session.id ? '…' : 'Завершить' }}
+              </button>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+  }
+</div>

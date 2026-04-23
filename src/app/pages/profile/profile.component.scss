@@ -1,0 +1,75 @@
+:host { display: block; }
+
+/* ─── Breadcrumb ──────────────────────────────────────────────────────────── */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.breadcrumb__back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--c-text-secondary);
+  text-decoration: none;
+  transition: color 0.15s;
+
+  &:hover { color: var(--c-primary); }
+  &:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm); }
+}
+
+.breadcrumb__sep { color: var(--c-border-strong); }
+
+.breadcrumb__current {
+  font-weight: 500;
+  color: var(--c-text);
+}
+
+/* ─── User card ───────────────────────────────────────────────────────────── */
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.user-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--c-primary-subtle);
+  color: var(--c-primary);
+  font-size: 20px;
+  font-weight: 700;
+  border: 2px solid var(--c-primary-border);
+}
+
+.user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-email {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--c-text);
+  word-break: break-all;
+}
+
+.user-actions { margin-left: auto; }
+
+/* ─── Sections ────────────────────────────────────────────────────────────── */
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--c-text);
+  margin-bottom: 12px;
+}

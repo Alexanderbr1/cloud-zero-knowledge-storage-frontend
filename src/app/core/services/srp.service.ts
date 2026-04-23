@@ -46,7 +46,6 @@ export class SrpService {
    * Returns srpSalt (hex), srpVerifier (hex), bcryptSalt (bcrypt string).
    */
   async createVerifier(
-    email: string,
     password: string
   ): Promise<{ srpSalt: string; srpVerifier: string; bcryptSalt: string }> {
     // bcrypt salt + hash — all computation stays in the browser
@@ -162,6 +161,7 @@ export class SrpService {
   }
 
   hexToBytes(hex: string): Uint8Array {
+    if (hex.length % 2) hex = '0' + hex;
     const out = new Uint8Array(hex.length / 2);
     for (let i = 0; i < hex.length; i += 2) {
       out[i >>> 1] = parseInt(hex.slice(i, i + 2), 16);

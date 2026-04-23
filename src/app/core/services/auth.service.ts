@@ -15,6 +15,7 @@ import { CryptoService } from './crypto.service';
 import { SrpService } from './srp.service';
 
 const LS_ACCESS = 'auth.access_token';
+const LS_EMAIL  = 'auth.email';
 /** Старый формат: refresh в localStorage; больше не используется. */
 const LEGACY_LS_REFRESH = 'auth.refresh_token';
 
@@ -25,6 +26,7 @@ export class AuthService {
   private readonly srp = inject(SrpService);
   private readonly baseUrl = `${environment.apiBaseUrl}/auth`;
   private readonly accessTokenSig = signal<string | null>(this.readAccessToken());
+  private readonly emailSig = signal<string | null>(this.readEmail());
 
   /**
    * Мастер-ключ живёт только в памяти — никогда в localStorage/sessionStorage.
@@ -41,6 +43,7 @@ export class AuthService {
   }
 
   readonly isAuthenticated = computed(() => !!this.accessTokenSig());
+  readonly email = this.emailSig.asReadonly();
 
   accessToken(): string | null {
     return this.accessTokenSig();
@@ -101,6 +104,8 @@ export class AuthService {
         finalize(() => {
           this.masterKey = null;
           this.clearAccess();
+          try { localStorage.removeItem(LS_EMAIL); } catch { /* ignore */ }
+          this.emailSig.set(null);
         })
       )
       .subscribe();
@@ -116,11 +121,20 @@ export class AuthService {
     this.accessTokenSig.set(null);
   }
 
+  private setEmail(email: string): void {
+    try { localStorage.setItem(LS_EMAIL, email); } catch { /* ignore */ }
+    this.emailSig.set(email);
+  }
+
+  private readEmail(): string | null {
+    try { return localStorage.getItem(LS_EMAIL) || null; } catch { return null; }
+  }
+
   // ─── Приватные методы ──────────────────────────────────────────────────
 
   private async _registerFlow(email: string, password: string): Promise<void> {
     // Все криптографические операции выполняются на клиенте
-    const { srpSalt, srpVerifier, bcryptSalt } = await this.srp.createVerifier(email, password);
+    const { srpSalt, srpVerifier, bcryptSalt } = await this.srp.createVerifier(password);
 
     const cryptoSalt = this.crypto.generateSalt();
     const masterKey = await this.crypto.deriveMasterKey(password, cryptoSalt);
@@ -138,6 +152,7 @@ export class AuthService {
     );
 
     this.masterKey = masterKey;
+    this.setEmail(email);
     this.setAccessToken(resp.access_token);
   }
 
@@ -184,6 +199,7 @@ export class AuthService {
     const masterKey = await this.crypto.deriveMasterKey(password, cryptoSaltBytes);
 
     this.masterKey = masterKey;
+    this.setEmail(normalizedEmail);
     this.setAccessToken(finalResp.access_token);
   }
 

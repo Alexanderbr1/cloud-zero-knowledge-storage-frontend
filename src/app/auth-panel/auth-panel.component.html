@@ -1,92 +1,85 @@
-<main class="auth-shell">
-  <div class="auth-backdrop" aria-hidden="true"></div>
+<div class="auth-shell">
 
-  <div class="auth-card" aria-labelledby="auth-title">
+  <div class="auth-card">
+    <!-- Brand -->
     <div class="auth-brand">
-      <div class="auth-logo" aria-hidden="true">C</div>
-      <div class="auth-brand-text">
-        <h1 id="auth-title" class="auth-title">Cloud Files</h1>
-        <p id="auth-subtitle" class="auth-subtitle">Вход и регистрация</p>
+      <div class="auth-logo" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M15.5 8.5a5.5 5.5 0 0 0-11 0A4 4 0 0 0 4 16h12a3.5 3.5 0 0 0-.5-7.5z" fill="currentColor"/>
+        </svg>
       </div>
+      <span class="auth-brand-name">Cloud Storage</span>
     </div>
 
+    <!-- Title -->
+    <h1 class="auth-title" id="auth-title">
+      {{ mode() === 'login' ? 'Войдите в аккаунт' : 'Создать аккаунт' }}
+    </h1>
+
+    <!-- Tabs -->
     <div class="auth-tabs" role="tablist" aria-label="Режим авторизации">
       <button
-        id="tab-login"
         type="button"
-        class="auth-tab"
         role="tab"
+        class="auth-tab"
+        [class.auth-tab--active]="mode() === 'login'"
         [attr.aria-selected]="mode() === 'login'"
-        [attr.tabindex]="mode() === 'login' ? 0 : -1"
-        [class.auth-tab-active]="mode() === 'login'"
         (click)="selectMode('login')"
-      >
-        Вход
-      </button>
+      >Вход</button>
       <button
-        id="tab-register"
         type="button"
-        class="auth-tab"
         role="tab"
+        class="auth-tab"
+        [class.auth-tab--active]="mode() === 'register'"
         [attr.aria-selected]="mode() === 'register'"
-        [attr.tabindex]="mode() === 'register' ? 0 : -1"
-        [class.auth-tab-active]="mode() === 'register'"
         (click)="selectMode('register')"
+      >Регистрация</button>
+    </div>
+
+    <!-- Form -->
+    <form class="auth-form" [formGroup]="credentialsForm()" (ngSubmit)="onSubmit()" novalidate>
+      <div class="auth-field">
+        <label class="auth-label" for="auth-email">Email</label>
+        <input
+          id="auth-email"
+          class="input"
+          type="email"
+          autocomplete="username"
+          formControlName="email"
+          placeholder="you@example.com"
+          enterkeyhint="next"
+        />
+      </div>
+
+      <div class="auth-field">
+        <label class="auth-label" for="auth-password">Пароль</label>
+        <input
+          id="auth-password"
+          class="input"
+          type="password"
+          [attr.autocomplete]="mode() === 'register' ? 'new-password' : 'current-password'"
+          formControlName="password"
+          [placeholder]="mode() === 'register' ? 'Минимум 8 символов' : 'Ваш пароль'"
+          enterkeyhint="go"
+        />
+      </div>
+
+      @if (errorText()) {
+        <div class="alert alert--error" role="alert">{{ errorText() }}</div>
+      }
+
+      <button
+        type="submit"
+        class="btn btn--primary btn--lg auth-submit"
+        [disabled]="isSubmitting() || credentialsForm().invalid"
       >
-        Регистрация
+        {{ isSubmitting()
+            ? (mode() === 'register' ? 'Создаём аккаунт…' : 'Входим…')
+            : (mode() === 'register' ? 'Создать аккаунт' : 'Войти') }}
       </button>
-    </div>
+    </form>
 
-    <div
-      id="auth-form-panel"
-      role="tabpanel"
-      [attr.aria-labelledby]="mode() === 'login' ? 'tab-login' : 'tab-register'"
-    >
-      <form class="auth-form" [formGroup]="credentialsForm()" (ngSubmit)="onSubmit()" novalidate>
-        <div class="auth-field">
-          <label class="auth-label" for="auth-email">Электронная почта</label>
-          <input
-            id="auth-email"
-            class="auth-input"
-            type="email"
-            autocomplete="username"
-            formControlName="email"
-            placeholder="email@example.com"
-            enterkeyhint="done"
-          />
-        </div>
-
-        <div class="auth-field">
-          <label class="auth-label" for="auth-password">Пароль</label>
-          <input
-            id="auth-password"
-            class="auth-input"
-            type="password"
-            [attr.autocomplete]="mode() === 'register' ? 'new-password' : 'current-password'"
-            formControlName="password"
-            placeholder="Минимум 8 символов при регистрации"
-            enterkeyhint="go"
-          />
-        </div>
-
-        @if (errorText()) {
-          <p class="auth-error" role="alert">{{ errorText() }}</p>
-        }
-
-        <button type="submit" class="auth-submit" [disabled]="isSubmitting() || credentialsForm().invalid">
-          {{
-            isSubmitting()
-              ? mode() === 'register'
-                ? 'Создаём аккаунт…'
-                : 'Входим…'
-              : mode() === 'register'
-                ? 'Продолжить'
-                : 'Войти'
-          }}
-        </button>
-      </form>
-    </div>
-
-    <p class="auth-hint">Нажимая кнопку, вы принимаете условия сервиса (демо).</p>
+    <p class="auth-hint">Используя сервис, вы принимаете условия (демо).</p>
   </div>
-</main>
+
+</div>
