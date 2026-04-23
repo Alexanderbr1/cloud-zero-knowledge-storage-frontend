@@ -2,9 +2,9 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { finalize } from 'rxjs';
 
-import { AuthService } from '../../core/services/auth.service';
-import { FileItem } from '../../core/models/file-item.model';
-import { FilesService } from '../../core/services/files.service';
+import { AuthService } from '../../../../core/services/auth.service';
+import { FileItem } from '../../models/file-item.model';
+import { FilesService } from '../../services/files.service';
 
 @Component({
   selector: 'app-files',

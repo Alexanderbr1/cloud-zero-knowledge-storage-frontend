@@ -2,10 +2,10 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { from, map, Observable, switchMap, throwError } from 'rxjs';
 
-import { environment } from '../../../environments/environment';
+import { environment } from '../../../../environments/environment';
 import { FileItem } from '../models/file-item.model';
-import { CryptoService } from './crypto.service';
-import { AuthService } from './auth.service';
+import { CryptoService } from '../../../core/services/crypto.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 interface PresignPutRequest {
   file_name: string;

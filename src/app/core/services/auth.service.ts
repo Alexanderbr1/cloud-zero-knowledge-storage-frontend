@@ -10,7 +10,7 @@ import type {
   LoginFinalizeRequestDto,
   RegisterRequestDto,
   TokenResponseDto,
-} from '../models/auth.model';
+} from '../../features/auth/models/auth.model';
 import { CryptoService } from './crypto.service';
 import { SrpService } from './srp.service';
 

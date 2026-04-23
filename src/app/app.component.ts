@@ -5,7 +5,7 @@ import { Router, RouterOutlet } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { AuthService } from './core/services/auth.service';
-import { AuthPanelComponent } from './auth-panel/auth-panel.component';
+import { AuthPanelComponent } from './features/auth/components/auth-panel/auth-panel.component';
 
 @Component({
   selector: 'app-root',

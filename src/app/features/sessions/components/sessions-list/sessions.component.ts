@@ -1,8 +1,8 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { finalize } from 'rxjs';
 
-import { DeviceSession } from '../core/models/session.model';
-import { SessionsService } from '../core/services/sessions.service';
+import { DeviceSession } from '../../models/session.model';
+import { SessionsService } from '../../services/sessions.service';
 
 @Component({
   selector: 'app-sessions',

@@ -14,12 +14,12 @@ export const routes: Routes = [
       {
         path: 'files',
         loadComponent: () =>
-          import('./pages/files/files.component').then(m => m.FilesComponent),
+          import('./features/storage/pages/files/files.component').then(m => m.FilesComponent),
       },
       {
         path: 'profile',
         loadComponent: () =>
-          import('./pages/profile/profile.component').then(m => m.ProfileComponent),
+          import('./features/sessions/pages/profile/profile.component').then(m => m.ProfileComponent),
       },
     ],
   },

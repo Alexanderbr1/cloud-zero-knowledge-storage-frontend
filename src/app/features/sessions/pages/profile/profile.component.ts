@@ -1,8 +1,8 @@
 import { Component, computed, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
-import { AuthService } from '../../core/services/auth.service';
-import { SessionsComponent } from '../../sessions/sessions.component';
+import { AuthService } from '../../../../core/services/auth.service';
+import { SessionsComponent } from '../../components/sessions-list/sessions.component';
 
 @Component({
   selector: 'app-profile',
