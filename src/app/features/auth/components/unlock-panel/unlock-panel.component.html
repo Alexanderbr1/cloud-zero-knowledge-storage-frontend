@@ -1,0 +1,50 @@
+<div class="auth-shell">
+  <div class="auth-card">
+
+    <div class="auth-brand">
+      <div class="auth-logo" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M15.5 8.5a5.5 5.5 0 0 0-11 0A4 4 0 0 0 4 16h12a3.5 3.5 0 0 0-.5-7.5z" fill="currentColor"/>
+        </svg>
+      </div>
+      <span class="auth-brand-name">Cloud Storage</span>
+    </div>
+
+    <h1 class="auth-title">Добро пожаловать</h1>
+    <p class="unlock-subtitle">Введите пароль для {{ email() }} чтобы разблокировать хранилище.</p>
+
+    <form class="auth-form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+      <div class="auth-field">
+        <label class="auth-label" for="unlock-password">Пароль</label>
+        <input
+          id="unlock-password"
+          class="input"
+          type="password"
+          autocomplete="current-password"
+          formControlName="password"
+          placeholder="Ваш пароль"
+          enterkeyhint="go"
+          autofocus
+        />
+      </div>
+
+      @if (errorText()) {
+        <div class="alert alert--error" role="alert">{{ errorText() }}</div>
+      }
+
+      <button
+        type="submit"
+        class="btn btn--primary btn--lg auth-submit"
+        [disabled]="isSubmitting() || form.invalid"
+      >
+        {{ isSubmitting() ? 'Разблокировка…' : 'Разблокировать' }}
+      </button>
+    </form>
+
+    <p class="auth-hint">
+      Это не вы?
+      <button type="button" class="link-btn" (click)="onLogout()">Выйти из аккаунта</button>
+    </p>
+
+  </div>
+</div>

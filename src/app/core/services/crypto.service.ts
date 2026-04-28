@@ -144,6 +144,31 @@ export class CryptoService {
     );
   }
 
+  // ─── Unlock check ────────────────────────────────────────────────────────
+
+  /**
+   * Создаёт unlock-check: оборачивает случайный AES-GCM ключ мастер-ключом (AES-KW).
+   * Результат хранится в localStorage и используется для верификации пароля при разблокировке.
+   * AES-KW имеет встроенную проверку целостности (RFC 3394) — unwrap с неверным ключом бросит ошибку.
+   */
+  async createUnlockCheck(masterKey: CryptoKey): Promise<string> {
+    const sentinelKey = await this.generateFileKey();
+    return this.wrapFileKey(sentinelKey, masterKey);
+  }
+
+  /**
+   * Проверяет unlock-check: пробует развернуть сохранённый ключ.
+   * Возвращает true если пароль верный, false если неверный.
+   */
+  async verifyUnlockCheck(wrappedB64: string, masterKey: CryptoKey): Promise<boolean> {
+    try {
+      await this.unwrapFileKey(wrappedB64, masterKey);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // ─── Шифрование / дешифрование файлов ───────────────────────────────────
 
   /**

@@ -1,7 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, finalize, from, map, take, tap, throwError } from 'rxjs';
-import { firstValueFrom } from 'rxjs';
+import { Observable, catchError, finalize, firstValueFrom, from, map, of, take, tap, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import type {
@@ -14,10 +13,13 @@ import type {
 import { CryptoService } from './crypto.service';
 import { SrpService } from './srp.service';
 
-const LS_ACCESS = 'auth.access_token';
 const LS_EMAIL  = 'auth.email';
-/** Старый формат: refresh в localStorage; больше не используется. */
-const LEGACY_LS_REFRESH = 'auth.refresh_token';
+const LS_CRYPTO_SALT = 'auth.crypto_salt';
+const LS_UNLOCK_CHECK = 'auth.unlock_check';
+/** Флаг: сессия когда-либо существовала → refresh-кука может быть жива. */
+const LS_SESSION_EXISTED = 'auth.session_existed';
+/** Ключи, которые больше не используются — чистим при старте. */
+const LEGACY_KEYS = ['auth.refresh_token', 'auth.access_token'];
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -25,24 +27,25 @@ export class AuthService {
   private readonly crypto = inject(CryptoService);
   private readonly srp = inject(SrpService);
   private readonly baseUrl = `${environment.apiBaseUrl}/auth`;
-  private readonly accessTokenSig = signal<string | null>(this.readAccessToken());
+  private readonly accessTokenSig = signal<string | null>(null);
   private readonly emailSig = signal<string | null>(this.readEmail());
 
   /**
    * Мастер-ключ живёт только в памяти — никогда в localStorage/sessionStorage.
    * Производится из пароля через PBKDF2. Обнуляется при logout.
    */
-  private masterKey: CryptoKey | null = null;
+  private readonly masterKeySig = signal<CryptoKey | null>(null);
 
   constructor() {
     try {
-      localStorage.removeItem(LEGACY_LS_REFRESH);
+      for (const key of LEGACY_KEYS) localStorage.removeItem(key);
     } catch {
       /* ignore */
     }
   }
 
   readonly isAuthenticated = computed(() => !!this.accessTokenSig());
+  readonly isUnlocked = computed(() => !!this.masterKeySig());
   readonly email = this.emailSig.asReadonly();
 
   accessToken(): string | null {
@@ -50,7 +53,48 @@ export class AuthService {
   }
 
   getMasterKey(): CryptoKey | null {
-    return this.masterKey;
+    return this.masterKeySig();
+  }
+
+  /**
+   * Пытается восстановить сессию через HttpOnly refresh-куку.
+   * Возвращает true при успехе, false при любой ошибке (кука истекла / не существует).
+   */
+  tryRestoreSession(): Observable<boolean> {
+    return this.http.post<TokenResponseDto>(`${this.baseUrl}/refresh`, {}).pipe(
+      tap((t) => this.setAccessToken(t.access_token)),
+      map(() => true),
+      catchError(() => of(false)),
+    );
+  }
+
+  /**
+   * Разблокировка мастер-ключа после перезагрузки страницы.
+   * Читает crypto_salt из localStorage, деривирует ключ через PBKDF2.
+   * Бросает ошибку, если crypto_salt не найден (нужен полный логин).
+   */
+  async unlockSession(password: string): Promise<void> {
+    const saltB64 = this.readCryptoSalt();
+    console.log('[unlockSession] saltB64 present:', !!saltB64);
+    if (!saltB64) {
+      throw new Error('Сессия устарела. Войдите снова.');
+    }
+    const saltBytes = new Uint8Array(this.crypto.fromBase64(saltB64));
+    console.log('[unlockSession] deriving masterKey...');
+    const key = await this.crypto.deriveMasterKey(password, saltBytes);
+    console.log('[unlockSession] masterKey derived');
+    const unlockCheck = this.readUnlockCheck();
+    console.log('[unlockSession] unlockCheck present:', !!unlockCheck);
+    if (unlockCheck) {
+      const valid = await this.crypto.verifyUnlockCheck(unlockCheck, key);
+      console.log('[unlockSession] verifyUnlockCheck:', valid);
+      if (!valid) {
+        throw new Error('Неверный пароль.');
+      }
+    }
+    console.log('[unlockSession] setting masterKeySig...');
+    this.masterKeySig.set(key);
+    console.log('[unlockSession] done | isUnlocked:', this.isUnlocked());
   }
 
   /**
@@ -102,9 +146,12 @@ export class AuthService {
       .pipe(
         take(1),
         finalize(() => {
-          this.masterKey = null;
+          this.masterKeySig.set(null);
           this.clearAccess();
           try { localStorage.removeItem(LS_EMAIL); } catch { /* ignore */ }
+          try { localStorage.removeItem(LS_CRYPTO_SALT); } catch { /* ignore */ }
+          try { localStorage.removeItem(LS_UNLOCK_CHECK); } catch { /* ignore */ }
+          try { localStorage.removeItem(LS_SESSION_EXISTED); } catch { /* ignore */ }
           this.emailSig.set(null);
         })
       )
@@ -113,12 +160,8 @@ export class AuthService {
 
   /** Только стереть access (например после неуспешного refresh). */
   clearAccess(): void {
-    try {
-      localStorage.removeItem(LS_ACCESS);
-    } catch {
-      /* ignore */
-    }
     this.accessTokenSig.set(null);
+    this.masterKeySig.set(null);
   }
 
   private setEmail(email: string): void {
@@ -128,6 +171,14 @@ export class AuthService {
 
   private readEmail(): string | null {
     try { return localStorage.getItem(LS_EMAIL) || null; } catch { return null; }
+  }
+
+  private readCryptoSalt(): string | null {
+    try { return localStorage.getItem(LS_CRYPTO_SALT) || null; } catch { return null; }
+  }
+
+  private readUnlockCheck(): string | null {
+    try { return localStorage.getItem(LS_UNLOCK_CHECK) || null; } catch { return null; }
   }
 
   // ─── Приватные методы ──────────────────────────────────────────────────
@@ -151,7 +202,10 @@ export class AuthService {
       this.http.post<TokenResponseDto>(`${this.baseUrl}/register`, payload)
     );
 
-    this.masterKey = masterKey;
+    const unlockCheck = await this.crypto.createUnlockCheck(masterKey);
+    try { localStorage.setItem(LS_CRYPTO_SALT, this.crypto.toBase64(cryptoSalt)); } catch { /* ignore */ }
+    try { localStorage.setItem(LS_UNLOCK_CHECK, unlockCheck); } catch { /* ignore */ }
+    this.masterKeySig.set(masterKey);
     this.setEmail(email);
     this.setAccessToken(resp.access_token);
   }
@@ -198,9 +252,17 @@ export class AuthService {
     const cryptoSaltBytes = new Uint8Array(this.crypto.fromBase64(initResp.crypto_salt));
     const masterKey = await this.crypto.deriveMasterKey(password, cryptoSaltBytes);
 
-    this.masterKey = masterKey;
+    const unlockCheck = await this.crypto.createUnlockCheck(masterKey);
+    try { localStorage.setItem(LS_CRYPTO_SALT, initResp.crypto_salt); } catch { /* ignore */ }
+    try { localStorage.setItem(LS_UNLOCK_CHECK, unlockCheck); } catch { /* ignore */ }
+    this.masterKeySig.set(masterKey);
     this.setEmail(normalizedEmail);
     this.setAccessToken(finalResp.access_token);
+  }
+
+  /** Возвращает true если сессия когда-либо существовала — refresh-кука может быть жива. */
+  hadSession(): boolean {
+    try { return !!localStorage.getItem(LS_SESSION_EXISTED); } catch { return false; }
   }
 
   private setAccessToken(accessToken: string): void {
@@ -209,21 +271,7 @@ export class AuthService {
       this.clearAccess();
       return;
     }
-    try {
-      localStorage.setItem(LS_ACCESS, t);
-    } catch {
-      /* ignore */
-    }
+    try { localStorage.setItem(LS_SESSION_EXISTED, '1'); } catch { /* ignore */ }
     this.accessTokenSig.set(t);
-  }
-
-  private readAccessToken(): string | null {
-    try {
-      const v = localStorage.getItem(LS_ACCESS);
-      const trimmed = v?.trim();
-      return trimmed ? trimmed : null;
-    } catch {
-      return null;
-    }
   }
 }

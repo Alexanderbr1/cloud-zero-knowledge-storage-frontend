@@ -8,7 +8,7 @@ import { DeviceSession, ListSessionsResponse } from '../models/session.model';
 @Injectable({ providedIn: 'root' })
 export class SessionsService {
   private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiBaseUrl}/auth/sessions`;
+  private readonly base = `${environment.apiBaseUrl}/sessions`;
 
   list(): Observable<DeviceSession[]> {
     return this.http.get<ListSessionsResponse>(this.base).pipe(map(r => r.sessions));
