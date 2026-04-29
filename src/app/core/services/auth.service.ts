@@ -13,9 +13,10 @@ import type {
 import { CryptoService } from './crypto.service';
 import { SrpService } from './srp.service';
 
-const LS_EMAIL  = 'auth.email';
-const LS_CRYPTO_SALT = 'auth.crypto_salt';
-const LS_UNLOCK_CHECK = 'auth.unlock_check';
+const LS_EMAIL           = 'auth.email';
+const LS_CRYPTO_SALT     = 'auth.crypto_salt';
+const LS_UNLOCK_CHECK    = 'auth.unlock_check';
+const LS_EC_PRIVATE_KEY  = 'auth.ec_private_key'; // two-level wrapped EC private key blob
 /** Флаг: сессия когда-либо существовала → refresh-кука может быть жива. */
 const LS_SESSION_EXISTED = 'auth.session_existed';
 /** Ключи, которые больше не используются — чистим при старте. */
@@ -36,6 +37,13 @@ export class AuthService {
    */
   private readonly masterKeySig = signal<CryptoKey | null>(null);
 
+  /**
+   * EC private key (P-256) — lives only in memory.
+   * Derived by unwrapping the encrypted blob from localStorage with the master key.
+   * Used for ECIES file sharing. Null for legacy accounts without EC keys.
+   */
+  private readonly ecPrivateKeySig = signal<CryptoKey | null>(null);
+
   constructor() {
     try {
       for (const key of LEGACY_KEYS) localStorage.removeItem(key);
@@ -54,6 +62,10 @@ export class AuthService {
 
   getMasterKey(): CryptoKey | null {
     return this.masterKeySig();
+  }
+
+  getECPrivateKey(): CryptoKey | null {
+    return this.ecPrivateKeySig();
   }
 
   /**
@@ -94,6 +106,10 @@ export class AuthService {
     }
     console.log('[unlockSession] setting masterKeySig...');
     this.masterKeySig.set(key);
+
+    // Restore EC private key from localStorage if present.
+    await this.loadECPrivateKey(key);
+
     console.log('[unlockSession] done | isUnlocked:', this.isUnlocked());
   }
 
@@ -102,7 +118,8 @@ export class AuthService {
    * 1. Генерируем bcrypt-соль и srp-соль на клиенте
    * 2. Вычисляем верификатор v = g^x mod N, x = H(srpSalt || bcrypt(pw, bcryptSalt))
    * 3. Генерируем crypto_salt и деривируем masterKey (PBKDF2)
-   * 4. Отправляем на сервер только производные значения — пароль не покидает браузер
+   * 4. Генерируем EC ключевую пару для шаринга файлов
+   * 5. Отправляем на сервер только производные значения — пароль не покидает браузер
    */
   register(email: string, password: string): Observable<void> {
     const blocked = this.crypto.webCryptoBlockedMessage();
@@ -147,10 +164,12 @@ export class AuthService {
         take(1),
         finalize(() => {
           this.masterKeySig.set(null);
+          this.ecPrivateKeySig.set(null);
           this.clearAccess();
           try { localStorage.removeItem(LS_EMAIL); } catch { /* ignore */ }
           try { localStorage.removeItem(LS_CRYPTO_SALT); } catch { /* ignore */ }
           try { localStorage.removeItem(LS_UNLOCK_CHECK); } catch { /* ignore */ }
+          try { localStorage.removeItem(LS_EC_PRIVATE_KEY); } catch { /* ignore */ }
           try { localStorage.removeItem(LS_SESSION_EXISTED); } catch { /* ignore */ }
           this.emailSig.set(null);
         })
@@ -162,6 +181,7 @@ export class AuthService {
   clearAccess(): void {
     this.accessTokenSig.set(null);
     this.masterKeySig.set(null);
+    this.ecPrivateKeySig.set(null);
   }
 
   private setEmail(email: string): void {
@@ -181,14 +201,31 @@ export class AuthService {
     try { return localStorage.getItem(LS_UNLOCK_CHECK) || null; } catch { return null; }
   }
 
+  private readEncryptedECPrivateKey(): string | null {
+    try { return localStorage.getItem(LS_EC_PRIVATE_KEY) || null; } catch { return null; }
+  }
+
+  /** Loads and unwraps the EC private key from localStorage. Silent on failure (legacy accounts). */
+  private async loadECPrivateKey(masterKey: CryptoKey): Promise<void> {
+    const encB64 = this.readEncryptedECPrivateKey();
+    if (!encB64) return;
+    try {
+      const privateKey = await this.crypto.unwrapECPrivateKey(encB64, masterKey);
+      this.ecPrivateKeySig.set(privateKey);
+    } catch {
+      // Stale or corrupted blob — silently ignore; sharing will be unavailable.
+    }
+  }
+
   // ─── Приватные методы ──────────────────────────────────────────────────
 
   private async _registerFlow(email: string, password: string): Promise<void> {
-    // Все криптографические операции выполняются на клиенте
     const { srpSalt, srpVerifier, bcryptSalt } = await this.srp.createVerifier(password);
 
     const cryptoSalt = this.crypto.generateSalt();
     const masterKey = await this.crypto.deriveMasterKey(password, cryptoSalt);
+
+    const { publicKeyB64, encryptedPrivateKeyB64 } = await this.crypto.generateECKeyPair(masterKey);
 
     const payload: RegisterRequestDto = {
       email,
@@ -196,6 +233,8 @@ export class AuthService {
       srp_verifier: srpVerifier,
       bcrypt_salt: bcryptSalt,
       crypto_salt: this.crypto.toBase64(cryptoSalt),
+      public_key: publicKeyB64,
+      encrypted_private_key: encryptedPrivateKeyB64,
     };
 
     const resp = await firstValueFrom(
@@ -205,17 +244,20 @@ export class AuthService {
     const unlockCheck = await this.crypto.createUnlockCheck(masterKey);
     try { localStorage.setItem(LS_CRYPTO_SALT, this.crypto.toBase64(cryptoSalt)); } catch { /* ignore */ }
     try { localStorage.setItem(LS_UNLOCK_CHECK, unlockCheck); } catch { /* ignore */ }
+    try { localStorage.setItem(LS_EC_PRIVATE_KEY, encryptedPrivateKeyB64); } catch { /* ignore */ }
     this.masterKeySig.set(masterKey);
+    try {
+      const ecPrivKey = await this.crypto.unwrapECPrivateKey(encryptedPrivateKeyB64, masterKey);
+      this.ecPrivateKeySig.set(ecPrivKey);
+    } catch { /* sharing unavailable */ }
     this.setEmail(email);
     this.setAccessToken(resp.access_token);
   }
 
   private async _loginFlow(email: string, password: string): Promise<void> {
     // Нормализуем email так же, как сервер: toLowerCase + trim.
-    // Важно: сервер хранит нормализованный email в SRP-сессии и использует его в M1.
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Шаг 1: генерируем эфемерный ключ клиента и отправляем init
     const { a, AHex } = this.srp.createClientEphemeral();
 
     const initResp = await firstValueFrom(
@@ -255,7 +297,14 @@ export class AuthService {
     const unlockCheck = await this.crypto.createUnlockCheck(masterKey);
     try { localStorage.setItem(LS_CRYPTO_SALT, initResp.crypto_salt); } catch { /* ignore */ }
     try { localStorage.setItem(LS_UNLOCK_CHECK, unlockCheck); } catch { /* ignore */ }
+
+    // Store EC private key from server response (absent for legacy accounts).
+    if (finalResp.encrypted_private_key) {
+      try { localStorage.setItem(LS_EC_PRIVATE_KEY, finalResp.encrypted_private_key); } catch { /* ignore */ }
+    }
+
     this.masterKeySig.set(masterKey);
+    await this.loadECPrivateKey(masterKey);
     this.setEmail(normalizedEmail);
     this.setAccessToken(finalResp.access_token);
   }

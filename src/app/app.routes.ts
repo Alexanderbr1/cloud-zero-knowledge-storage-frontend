@@ -17,6 +17,11 @@ export const routes: Routes = [
           import('./features/storage/pages/files/files.component').then(m => m.FilesComponent),
       },
       {
+        path: 'shared',
+        loadComponent: () =>
+          import('./features/storage/pages/shared/shared-with-me.component').then(m => m.SharedWithMeComponent),
+      },
+      {
         path: 'profile',
         loadComponent: () =>
           import('./features/sessions/pages/profile/profile.component').then(m => m.ProfileComponent),

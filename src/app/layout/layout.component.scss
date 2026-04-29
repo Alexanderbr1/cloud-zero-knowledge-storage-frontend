@@ -55,6 +55,33 @@
   color: var(--c-text);
 }
 
+/* Nav links */
+.nav__links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav__link {
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--c-text-secondary, var(--c-text-muted));
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover {
+    background: var(--c-surface-hover);
+    color: var(--c-text);
+  }
+
+  &--active {
+    background: var(--c-primary-subtle);
+    color: var(--c-primary);
+  }
+}
+
 /* Right */
 .nav__right {
   display: flex;

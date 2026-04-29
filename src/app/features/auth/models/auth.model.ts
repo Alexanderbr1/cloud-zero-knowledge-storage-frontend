@@ -1,10 +1,12 @@
 /** POST /auth/register */
 export interface RegisterRequestDto {
   email: string;
-  srp_salt: string;     // hex-encoded SRP salt
-  srp_verifier: string; // hex-encoded verifier v = g^x mod N
-  bcrypt_salt: string;  // bcrypt salt string ($2b$10$...)
-  crypto_salt: string;  // base64-encoded PBKDF2 salt for file encryption
+  srp_salt: string;              // hex-encoded SRP salt
+  srp_verifier: string;          // hex-encoded verifier v = g^x mod N
+  bcrypt_salt: string;           // bcrypt salt string ($2b$10$...)
+  crypto_salt: string;           // base64-encoded PBKDF2 salt for file encryption
+  public_key: string;            // base64-encoded SPKI P-256 public key
+  encrypted_private_key: string; // base64-encoded two-level wrapped EC private key
 }
 
 /** POST /auth/login/init */
@@ -36,4 +38,6 @@ export interface TokenResponseDto {
   token_type: string;
   /** Present only in login/finalize — client must verify this. */
   M2?: string;
+  /** Present in login/finalize for accounts with EC keys; absent for legacy accounts. */
+  encrypted_private_key?: string;
 }

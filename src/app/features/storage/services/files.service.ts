@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { from, map, Observable, switchMap, throwError } from 'rxjs';
+import { Observable, from, map, switchMap, throwError } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
 import { FileItem } from '../models/file-item.model';
@@ -50,22 +50,18 @@ export class FilesService {
       .pipe(map((response) => response.items));
   }
 
-  /**
-   * Загрузка файла с клиентским шифрованием:
-   * 1. Читаем файл как ArrayBuffer
-   * 2. Генерируем уникальный файловый ключ (AES-256-GCM)
-   * 3. Шифруем содержимое — сервер никогда не видит plaintext
-   * 4. Оборачиваем файловый ключ мастер-ключом (AES-KW)
-   * 5. Отправляем wrapped key + IV на сервер вместе с presign-запросом
-   * 6. Загружаем зашифрованный blob по presigned URL
-   */
-  uploadFile(file: File): Observable<PresignPutResponse> {
+  uploadFile(
+    file: File,
+    onProgress?: (phase: 'reading' | 'encrypting' | 'uploading', pct: number) => void
+  ): Observable<PresignPutResponse> {
     const masterKey = this.auth.getMasterKey();
     if (!masterKey) {
       return throwError(() => new Error('Master key not available. Please log in again.'));
     }
 
-    return from(this.prepareEncryptedUpload(file, masterKey)).pipe(
+    onProgress?.('reading', 0);
+
+    return from(this.prepareEncryptedUpload(file, masterKey, onProgress)).pipe(
       switchMap(({ encryptedBuffer, wrappedKeyB64, ivB64 }) => {
         const contentType = file.type?.trim() || 'application/octet-stream';
         const payload: PresignPutRequest = {
@@ -76,22 +72,16 @@ export class FilesService {
         };
 
         return this.http.post<PresignPutResponse>(`${this.baseUrl}/presign`, payload).pipe(
-          switchMap((presign) =>
-            from(
-              fetch(presign.upload_url, {
-                method: presign.http_method || 'PUT',
-                headers: { 'Content-Type': presign.content_type || contentType },
-                body: encryptedBuffer
-              })
-            ).pipe(
-              map((response) => {
-                if (!response.ok) {
-                  throw new Error(`Upload failed with status ${response.status}`);
-                }
-                return presign;
-              })
-            )
-          )
+          switchMap((presign) => {
+            onProgress?.('uploading', 0);
+            return this.xhrUpload(
+              presign.upload_url,
+              presign.http_method || 'PUT',
+              presign.content_type || contentType,
+              encryptedBuffer,
+              (pct) => onProgress?.('uploading', pct)
+            ).pipe(map(() => presign));
+          })
         );
       })
     );
@@ -125,15 +115,66 @@ export class FilesService {
 
   // ─── Приватные методы ──────────────────────────────────────────────────
 
+  private xhrUpload(
+    url: string,
+    method: string,
+    contentType: string,
+    body: ArrayBuffer,
+    onProgress?: (pct: number) => void
+  ): Observable<void> {
+    return new Observable<void>(observer => {
+      const xhr = new XMLHttpRequest();
+      xhr.open(method, url);
+      xhr.setRequestHeader('Content-Type', contentType);
+
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          onProgress?.(Math.round((event.loaded / event.total) * 100));
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          observer.next();
+          observer.complete();
+        } else {
+          observer.error(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      });
+
+      xhr.addEventListener('error', () => observer.error(new Error('Upload failed: network error')));
+      xhr.addEventListener('abort', () => observer.error(new Error('Upload aborted')));
+
+      xhr.send(body);
+      return () => xhr.abort();
+    });
+  }
+
   private async prepareEncryptedUpload(
     file: File,
-    masterKey: CryptoKey
+    masterKey: CryptoKey,
+    onProgress?: (phase: 'reading' | 'encrypting' | 'uploading', pct: number) => void
   ): Promise<{ encryptedBuffer: ArrayBuffer; wrappedKeyB64: string; ivB64: string }> {
-    const plaintext = await file.arrayBuffer();
+    const plaintext = await this.readFileWithProgress(file, (pct) => onProgress?.('reading', pct));
+    onProgress?.('encrypting', 0);
     const fileKey = await this.crypto.generateFileKey();
     const { ciphertext, ivB64 } = await this.crypto.encryptFile(plaintext, fileKey);
     const wrappedKeyB64 = await this.crypto.wrapFileKey(fileKey, masterKey);
     return { encryptedBuffer: ciphertext, wrappedKeyB64, ivB64 };
+  }
+
+  private readFileWithProgress(file: File, onProgress: (pct: number) => void): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onprogress = (event) => {
+        if (event.lengthComputable) {
+          onProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      };
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = () => reject(new Error('File read failed'));
+      reader.readAsArrayBuffer(file);
+    });
   }
 
   private async fetchAndDecrypt(resp: PresignGetResponse, fileName: string): Promise<void> {

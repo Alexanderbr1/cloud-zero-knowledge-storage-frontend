@@ -1,0 +1,115 @@
+:host { display: block; }
+
+.alert { margin-bottom: 16px; }
+
+.files-card { overflow: hidden; }
+
+.table-head,
+.table-row {
+  display: grid;
+  grid-template-columns: 1fr 160px 90px 100px 48px;
+  align-items: center;
+  gap: 12px;
+}
+
+.table-head {
+  padding: 10px 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.table-list { list-style: none; }
+
+.table-row {
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--c-border);
+  transition: background 0.1s;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: var(--c-surface-hover); }
+}
+
+.table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.empty-icon { opacity: 0.5; }
+
+.col-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.file-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
+  background: var(--c-primary-subtle);
+  color: var(--c-primary);
+}
+
+.file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--c-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.col-owner,
+.col-type,
+.col-date {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.col-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@media (max-width: 700px) {
+  .table-head,
+  .table-row {
+    grid-template-columns: 1fr 120px 90px 48px;
+  }
+  .col-type { display: none; }
+  .table-head .col-type { display: none; }
+}
+
+@media (max-width: 500px) {
+  .table-head,
+  .table-row {
+    grid-template-columns: 1fr 48px;
+  }
+  .col-owner,
+  .col-date { display: none; }
+  .table-head .col-owner,
+  .table-head .col-date { display: none; }
+}
