@@ -7,6 +7,7 @@ import { AuthService } from '../../../../core/services/auth.service';
 import { ShareItem, SharingService } from '../../../../core/services/sharing.service';
 import { FileItem } from '../../models/file-item.model';
 import { FilesService } from '../../services/files.service';
+import { shortMimeType } from '../../../../core/utils/browser.utils';
 
 @Component({
   selector: 'app-files',
@@ -237,14 +238,7 @@ export class FilesComponent implements OnInit {
   }
 
   shortType(mime: string): string {
-    if (!mime) return '—';
-    const map: Record<string, string> = {
-      'image/jpeg': 'JPEG', 'image/png': 'PNG', 'image/gif': 'GIF',
-      'image/webp': 'WebP', 'image/svg+xml': 'SVG', 'application/pdf': 'PDF',
-      'text/plain': 'TXT', 'text/csv': 'CSV', 'application/zip': 'ZIP',
-      'application/json': 'JSON', 'video/mp4': 'MP4', 'audio/mpeg': 'MP3',
-    };
-    return map[mime] ?? mime.split('/')[1]?.toUpperCase() ?? mime;
+    return shortMimeType(mime);
   }
 
   private isMasterKeyMissing(err: unknown): boolean {

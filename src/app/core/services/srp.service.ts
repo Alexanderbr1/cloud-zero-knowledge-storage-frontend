@@ -30,12 +30,14 @@ export class SrpService {
   private readonly G = 2n;
   private readonly N_BYTES = 256; // 2048 / 8
 
-  // k = H(pad(N) || pad(g)), computed once asynchronously.
-  private kPromise: Promise<bigint>;
+  // k = H(pad(N) || pad(g)) and xorNG = H(N) ⊕ H(g) — group constants, computed once.
+  private readonly kPromise: Promise<bigint>;
+  private readonly xorNGPromise: Promise<Uint8Array>;
 
   constructor() {
     this.N = BigInt('0x' + this.N_HEX);
     this.kPromise = this.computeK();
+    this.xorNGPromise = this.computeXorNG();
   }
 
   // ─── Public API ──────────────────────────────────────────────────────────
@@ -68,10 +70,6 @@ export class SrpService {
     };
   }
 
-  /**
-   * Generates a random client private ephemeral a and computes A = g^a mod N.
-   * Call once at the start of login, before the init HTTP request.
-   */
   createClientEphemeral(): { a: bigint; AHex: string } {
     const aBytes = globalThis.crypto.getRandomValues(new Uint8Array(32));
     const a = this.bytesToBigInt(aBytes);
@@ -125,12 +123,10 @@ export class SrpService {
     const K = await this.sha256(this.pad(S));
 
     // M1 = SHA-256(H(N)⊕H(g) || H(email) || srpSalt || pad(A) || pad(B) || K)
-    // H(N) and H(g) must use padded values (256 bytes) to match server-side pad(bigN)/pad(bigG).
-    const hN = await this.sha256(this.hexToBytes(this.N_HEX)); // N is already 256 bytes
-    const hG = await this.sha256(this.pad(this.G));            // pad(2) = 256 bytes, last = 0x02
-    const xorNG = hN.map((b, i) => b ^ hG[i]);
-
-    const hEmail = await this.sha256(new TextEncoder().encode(email));
+    const [xorNG, hEmail] = await Promise.all([
+      this.xorNGPromise,
+      this.sha256(new TextEncoder().encode(email)),
+    ]);
 
     const M1 = await this.sha256(
       xorNG,
@@ -188,6 +184,15 @@ export class SrpService {
     let off = 0;
     for (const c of chunks) { buf.set(c, off); off += c.length; }
     return new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', buf));
+  }
+
+  /** xorNG = H(N) ⊕ H(g) — constant term in M1 formula. H(N) uses N as already 256-byte hex. */
+  private async computeXorNG(): Promise<Uint8Array> {
+    const [hN, hG] = await Promise.all([
+      this.sha256(this.hexToBytes(this.N_HEX)),
+      this.sha256(this.pad(this.G)),
+    ]);
+    return hN.map((b, i) => b ^ hG[i]);
   }
 
   /** k = SHA-256(pad(N) || pad(g))  — SRP-6a multiplier. */

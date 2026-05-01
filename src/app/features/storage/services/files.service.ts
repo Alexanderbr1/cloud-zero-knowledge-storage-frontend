@@ -6,6 +6,7 @@ import { environment } from '../../../../environments/environment';
 import { FileItem } from '../models/file-item.model';
 import { CryptoService } from '../../../core/services/crypto.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { triggerBrowserDownload } from '../../../core/utils/browser.utils';
 
 interface PresignPutRequest {
   file_name: string;
@@ -20,7 +21,6 @@ interface PresignPutResponse {
   expires_in: number;
   http_method: string;
   content_type: string;
-  instructions: string;
 }
 
 interface PresignGetResponse {
@@ -192,20 +192,6 @@ export class FilesService {
     const fileKey = await this.crypto.unwrapFileKey(resp.encrypted_file_key, masterKey);
     const plaintext = await this.crypto.decryptFile(encryptedData, fileKey, resp.file_iv);
 
-    this.triggerBrowserDownload(plaintext, fileName, resp.content_type);
-  }
-
-  private triggerBrowserDownload(data: ArrayBuffer, fileName: string, contentType: string): void {
-    const blob = new Blob([data], { type: contentType || 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    // Освобождаем URL через 60 секунд
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    triggerBrowserDownload(plaintext, fileName, resp.content_type);
   }
 }

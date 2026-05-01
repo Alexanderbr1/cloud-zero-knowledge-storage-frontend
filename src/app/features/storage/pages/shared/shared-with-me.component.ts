@@ -5,6 +5,7 @@ import { finalize, from, switchMap } from 'rxjs';
 import { AuthService } from '../../../../core/services/auth.service';
 import { CryptoService } from '../../../../core/services/crypto.service';
 import { ShareItem, SharingService } from '../../../../core/services/sharing.service';
+import { shortMimeType, triggerBrowserDownload } from '../../../../core/utils/browser.utils';
 
 @Component({
   selector: 'app-shared-with-me',
@@ -62,14 +63,7 @@ export class SharedWithMeComponent implements OnInit {
   }
 
   shortType(mime: string): string {
-    if (!mime) return '—';
-    const map: Record<string, string> = {
-      'image/jpeg': 'JPEG', 'image/png': 'PNG', 'image/gif': 'GIF',
-      'image/webp': 'WebP', 'image/svg+xml': 'SVG', 'application/pdf': 'PDF',
-      'text/plain': 'TXT', 'text/csv': 'CSV', 'application/zip': 'ZIP',
-      'application/json': 'JSON', 'video/mp4': 'MP4', 'audio/mpeg': 'MP3',
-    };
-    return map[mime] ?? mime.split('/')[1]?.toUpperCase() ?? mime;
+    return shortMimeType(mime);
   }
 
   private async fetchAndSave(
@@ -80,19 +74,6 @@ export class SharedWithMeComponent implements OnInit {
     if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
     const encrypted = await resp.arrayBuffer();
     const plaintext = await this.crypto.decryptFile(encrypted, result.fileKey, result.fileIVb64);
-    this.triggerBrowserDownload(plaintext, result.fileName, contentType);
-  }
-
-  private triggerBrowserDownload(data: ArrayBuffer, fileName: string, contentType: string): void {
-    const blob = new Blob([data], { type: contentType || 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    triggerBrowserDownload(plaintext, result.fileName, contentType);
   }
 }

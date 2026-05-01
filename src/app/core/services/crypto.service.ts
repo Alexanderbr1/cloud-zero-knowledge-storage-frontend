@@ -59,7 +59,6 @@ export class CryptoService {
 
   // ─── Генерация соли ──────────────────────────────────────────────────────
 
-  /** Генерирует случайные 32 байта соли для PBKDF2. */
   generateSalt(): Uint8Array {
     if (!globalThis.crypto?.getRandomValues) {
       throw new Error(this.webCryptoBlockedMessage() ?? 'Web Crypto недоступен.');
@@ -106,7 +105,6 @@ export class CryptoService {
 
   // ─── Файловые ключи ──────────────────────────────────────────────────────
 
-  /** Генерирует уникальный AES-256-GCM ключ для каждого файла. */
   async generateFileKey(): Promise<CryptoKey> {
     const subtle = this.requireSubtle();
     return subtle.generateKey(
@@ -116,20 +114,12 @@ export class CryptoService {
     );
   }
 
-  /**
-   * Оборачивает файловый ключ мастер-ключом (AES-KW, RFC 3394).
-   * Возвращает base64-строку для хранения на сервере.
-   */
   async wrapFileKey(fileKey: CryptoKey, masterKey: CryptoKey): Promise<string> {
     const subtle = this.requireSubtle();
     const wrapped = await subtle.wrapKey('raw', fileKey, masterKey, 'AES-KW');
     return this.toBase64(wrapped);
   }
 
-  /**
-   * Разворачивает файловый ключ из base64 мастер-ключом.
-   * Результат — non-extractable AES-GCM ключ.
-   */
   async unwrapFileKey(wrappedKeyB64: string, masterKey: CryptoKey): Promise<CryptoKey> {
     const subtle = this.requireSubtle();
     const wrappedKey = this.fromBase64(wrappedKeyB64);
@@ -156,10 +146,6 @@ export class CryptoService {
     return this.wrapFileKey(sentinelKey, masterKey);
   }
 
-  /**
-   * Проверяет unlock-check: пробует развернуть сохранённый ключ.
-   * Возвращает true если пароль верный, false если неверный.
-   */
   async verifyUnlockCheck(wrappedB64: string, masterKey: CryptoKey): Promise<boolean> {
     try {
       await this.unwrapFileKey(wrappedB64, masterKey);
@@ -219,10 +205,6 @@ export class CryptoService {
     return this.toBase64(out);
   }
 
-  /**
-   * Unwraps the EC private key from the two-level encrypted blob.
-   * Returns a non-extractable CryptoKey ready for ECDH deriveBits.
-   */
   async unwrapECPrivateKey(encryptedB64: string, masterKey: CryptoKey): Promise<CryptoKey> {
     const subtle = this.requireSubtle();
     const buf = new Uint8Array(this.fromBase64(encryptedB64));
@@ -376,10 +358,6 @@ export class CryptoService {
     return { ciphertext, ivB64: this.toBase64(iv) };
   }
 
-  /**
-   * Дешифрует ArrayBuffer файловым ключом.
-   * AES-GCM встроенно проверяет аутентификационный тег — если данные подделаны, выбросит ошибку.
-   */
   async decryptFile(
     ciphertext: ArrayBuffer,
     fileKey: CryptoKey,

@@ -29,7 +29,7 @@ export class AuthService {
   private readonly srp = inject(SrpService);
   private readonly baseUrl = `${environment.apiBaseUrl}/auth`;
   private readonly accessTokenSig = signal<string | null>(null);
-  private readonly emailSig = signal<string | null>(this.readEmail());
+  private readonly emailSig = signal<string | null>(this.lsRead(LS_EMAIL));
 
   /**
    * Мастер-ключ живёт только в памяти — никогда в localStorage/sessionStorage.
@@ -45,11 +45,7 @@ export class AuthService {
   private readonly ecPrivateKeySig = signal<CryptoKey | null>(null);
 
   constructor() {
-    try {
-      for (const key of LEGACY_KEYS) localStorage.removeItem(key);
-    } catch {
-      /* ignore */
-    }
+    this.lsRemove(...LEGACY_KEYS);
   }
 
   readonly isAuthenticated = computed(() => !!this.accessTokenSig());
@@ -68,10 +64,6 @@ export class AuthService {
     return this.ecPrivateKeySig();
   }
 
-  /**
-   * Пытается восстановить сессию через HttpOnly refresh-куку.
-   * Возвращает true при успехе, false при любой ошибке (кука истекла / не существует).
-   */
   tryRestoreSession(): Observable<boolean> {
     return this.http.post<TokenResponseDto>(`${this.baseUrl}/refresh`, {}).pipe(
       tap((t) => this.setAccessToken(t.access_token)),
@@ -80,37 +72,22 @@ export class AuthService {
     );
   }
 
-  /**
-   * Разблокировка мастер-ключа после перезагрузки страницы.
-   * Читает crypto_salt из localStorage, деривирует ключ через PBKDF2.
-   * Бросает ошибку, если crypto_salt не найден (нужен полный логин).
-   */
   async unlockSession(password: string): Promise<void> {
-    const saltB64 = this.readCryptoSalt();
-    console.log('[unlockSession] saltB64 present:', !!saltB64);
+    const saltB64 = this.lsRead(LS_CRYPTO_SALT);
     if (!saltB64) {
       throw new Error('Сессия устарела. Войдите снова.');
     }
     const saltBytes = new Uint8Array(this.crypto.fromBase64(saltB64));
-    console.log('[unlockSession] deriving masterKey...');
     const key = await this.crypto.deriveMasterKey(password, saltBytes);
-    console.log('[unlockSession] masterKey derived');
-    const unlockCheck = this.readUnlockCheck();
-    console.log('[unlockSession] unlockCheck present:', !!unlockCheck);
+    const unlockCheck = this.lsRead(LS_UNLOCK_CHECK);
     if (unlockCheck) {
       const valid = await this.crypto.verifyUnlockCheck(unlockCheck, key);
-      console.log('[unlockSession] verifyUnlockCheck:', valid);
       if (!valid) {
         throw new Error('Неверный пароль.');
       }
     }
-    console.log('[unlockSession] setting masterKeySig...');
     this.masterKeySig.set(key);
-
-    // Restore EC private key from localStorage if present.
     await this.loadECPrivateKey(key);
-
-    console.log('[unlockSession] done | isUnlocked:', this.isUnlocked());
   }
 
   /**
@@ -143,10 +120,6 @@ export class AuthService {
     return from(this._loginFlow(email, password));
   }
 
-  /**
-   * Новая пара токенов: refresh читается с сервера из HttpOnly-куки.
-   * Мастер-ключ НЕ переинициализируется при refresh — он уже в памяти.
-   */
   refreshSession(): Observable<void> {
     return this.http.post<TokenResponseDto>(`${this.baseUrl}/refresh`, {}).pipe(
       tap((t) => this.setAccessToken(t.access_token)),
@@ -154,60 +127,48 @@ export class AuthService {
     );
   }
 
-  /**
-   * Отзыв refresh на сервере + очистка HttpOnly-куки; локально убираем access и мастер-ключ.
-   */
   logout(): void {
     this.http
       .post<void>(`${this.baseUrl}/logout`, {})
       .pipe(
         take(1),
         finalize(() => {
-          this.masterKeySig.set(null);
-          this.ecPrivateKeySig.set(null);
           this.clearAccess();
-          try { localStorage.removeItem(LS_EMAIL); } catch { /* ignore */ }
-          try { localStorage.removeItem(LS_CRYPTO_SALT); } catch { /* ignore */ }
-          try { localStorage.removeItem(LS_UNLOCK_CHECK); } catch { /* ignore */ }
-          try { localStorage.removeItem(LS_EC_PRIVATE_KEY); } catch { /* ignore */ }
-          try { localStorage.removeItem(LS_SESSION_EXISTED); } catch { /* ignore */ }
+          this.lsRemove(LS_EMAIL, LS_CRYPTO_SALT, LS_UNLOCK_CHECK, LS_EC_PRIVATE_KEY, LS_SESSION_EXISTED);
           this.emailSig.set(null);
         })
       )
       .subscribe();
   }
 
-  /** Только стереть access (например после неуспешного refresh). */
   clearAccess(): void {
     this.accessTokenSig.set(null);
     this.masterKeySig.set(null);
     this.ecPrivateKeySig.set(null);
   }
 
+  private lsRead(key: string): string | null {
+    try { return localStorage.getItem(key) || null; } catch { return null; }
+  }
+
+  private lsWrite(key: string, value: string): void {
+    try { localStorage.setItem(key, value); } catch { /* ignore */ }
+  }
+
+  private lsRemove(...keys: string[]): void {
+    for (const key of keys) {
+      try { localStorage.removeItem(key); } catch { /* ignore */ }
+    }
+  }
+
   private setEmail(email: string): void {
-    try { localStorage.setItem(LS_EMAIL, email); } catch { /* ignore */ }
+    this.lsWrite(LS_EMAIL, email);
     this.emailSig.set(email);
-  }
-
-  private readEmail(): string | null {
-    try { return localStorage.getItem(LS_EMAIL) || null; } catch { return null; }
-  }
-
-  private readCryptoSalt(): string | null {
-    try { return localStorage.getItem(LS_CRYPTO_SALT) || null; } catch { return null; }
-  }
-
-  private readUnlockCheck(): string | null {
-    try { return localStorage.getItem(LS_UNLOCK_CHECK) || null; } catch { return null; }
-  }
-
-  private readEncryptedECPrivateKey(): string | null {
-    try { return localStorage.getItem(LS_EC_PRIVATE_KEY) || null; } catch { return null; }
   }
 
   /** Loads and unwraps the EC private key from localStorage. Silent on failure (legacy accounts). */
   private async loadECPrivateKey(masterKey: CryptoKey): Promise<void> {
-    const encB64 = this.readEncryptedECPrivateKey();
+    const encB64 = this.lsRead(LS_EC_PRIVATE_KEY);
     if (!encB64) return;
     try {
       const privateKey = await this.crypto.unwrapECPrivateKey(encB64, masterKey);
@@ -242,9 +203,9 @@ export class AuthService {
     );
 
     const unlockCheck = await this.crypto.createUnlockCheck(masterKey);
-    try { localStorage.setItem(LS_CRYPTO_SALT, this.crypto.toBase64(cryptoSalt)); } catch { /* ignore */ }
-    try { localStorage.setItem(LS_UNLOCK_CHECK, unlockCheck); } catch { /* ignore */ }
-    try { localStorage.setItem(LS_EC_PRIVATE_KEY, encryptedPrivateKeyB64); } catch { /* ignore */ }
+    this.lsWrite(LS_CRYPTO_SALT, this.crypto.toBase64(cryptoSalt));
+    this.lsWrite(LS_UNLOCK_CHECK, unlockCheck);
+    this.lsWrite(LS_EC_PRIVATE_KEY, encryptedPrivateKeyB64);
     this.masterKeySig.set(masterKey);
     try {
       const ecPrivKey = await this.crypto.unwrapECPrivateKey(encryptedPrivateKeyB64, masterKey);
@@ -295,12 +256,10 @@ export class AuthService {
     const masterKey = await this.crypto.deriveMasterKey(password, cryptoSaltBytes);
 
     const unlockCheck = await this.crypto.createUnlockCheck(masterKey);
-    try { localStorage.setItem(LS_CRYPTO_SALT, initResp.crypto_salt); } catch { /* ignore */ }
-    try { localStorage.setItem(LS_UNLOCK_CHECK, unlockCheck); } catch { /* ignore */ }
-
-    // Store EC private key from server response (absent for legacy accounts).
+    this.lsWrite(LS_CRYPTO_SALT, initResp.crypto_salt);
+    this.lsWrite(LS_UNLOCK_CHECK, unlockCheck);
     if (finalResp.encrypted_private_key) {
-      try { localStorage.setItem(LS_EC_PRIVATE_KEY, finalResp.encrypted_private_key); } catch { /* ignore */ }
+      this.lsWrite(LS_EC_PRIVATE_KEY, finalResp.encrypted_private_key);
     }
 
     this.masterKeySig.set(masterKey);
@@ -309,9 +268,8 @@ export class AuthService {
     this.setAccessToken(finalResp.access_token);
   }
 
-  /** Возвращает true если сессия когда-либо существовала — refresh-кука может быть жива. */
   hadSession(): boolean {
-    try { return !!localStorage.getItem(LS_SESSION_EXISTED); } catch { return false; }
+    return !!this.lsRead(LS_SESSION_EXISTED);
   }
 
   private setAccessToken(accessToken: string): void {
@@ -320,7 +278,7 @@ export class AuthService {
       this.clearAccess();
       return;
     }
-    try { localStorage.setItem(LS_SESSION_EXISTED, '1'); } catch { /* ignore */ }
+    this.lsWrite(LS_SESSION_EXISTED, '1');
     this.accessTokenSig.set(t);
   }
 }
