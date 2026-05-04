@@ -2,19 +2,28 @@
 
   <!-- Page header -->
   <div class="page-header">
-    <h1 class="page-title">Объекты</h1>
-
-    <button type="button" class="btn btn--primary"
-            [disabled]="isUploading() || isSelectingFile()"
-            (click)="openFilePicker()">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <path d="M8 2v9M4 6l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-      @if (isUploading()) { Загрузка… }
-      @else if (isSelectingFile()) { Выбор файла… }
-      @else { Загрузить }
-    </button>
+    <h1 class="page-title">Мой диск</h1>
+    <div class="page-header__actions">
+      <button type="button" class="btn btn--secondary"
+              [disabled]="isUploading() || isCreatingFolder()"
+              (click)="openCreateFolder()">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+          <path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.379a1.5 1.5 0 0 1 1.06.44L8 3.5H12.5A1.5 1.5 0 0 1 14 5v6a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 11V3.5Z" stroke="currentColor" stroke-width="1.3"/>
+        </svg>
+        Новая папка
+      </button>
+      <button type="button" class="btn btn--primary"
+              [disabled]="isUploading() || isSelectingFile()"
+              (click)="openFilePicker()">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M8 2v9M4 6l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        @if (isUploading()) { Загрузка… }
+        @else if (isSelectingFile()) { Выбор файла… }
+        @else { Загрузить }
+      </button>
+    </div>
     <input
       #fileInput
       type="file"
@@ -25,7 +34,29 @@
     />
   </div>
 
-  <!-- Selected file upload bar -->
+  <!-- Breadcrumb -->
+  @if (hasBreadcrumbs()) {
+    <nav class="breadcrumb" aria-label="Навигация по папкам">
+      @for (crumb of breadcrumbs(); track (crumb.folder_id || 'root'); let i = $index, last = $last) {
+        @if (!last) {
+          <button
+            type="button"
+            class="breadcrumb__btn"
+            (click)="navigateToBreadcrumb(i)"
+          >{{ crumb.name }}</button>
+          <span class="breadcrumb__sep" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        } @else {
+          <span class="breadcrumb__current" aria-current="page">{{ crumb.name }}</span>
+        }
+      }
+    </nav>
+  }
+
+  <!-- Upload progress bar -->
   @if (selectedFile()) {
     <div class="upload-bar card">
       <div class="upload-bar__top">
@@ -39,7 +70,15 @@
         </div>
       </div>
       <div class="upload-progress-wrap">
-        <div class="upload-progress">
+        <div
+          class="upload-progress"
+          role="progressbar"
+          [attr.aria-valuenow]="uploadPhase() === 'encrypting' ? null : uploadProgress()"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          [attr.aria-valuetext]="uploadPhase() === 'encrypting' ? 'Шифрование…' : uploadProgress() + '%'"
+          [attr.aria-label]="'Загрузка ' + selectedFile()!.name"
+        >
           <div
             class="upload-progress__fill"
             [class.upload-progress__fill--indeterminate]="uploadPhase() === 'encrypting'"
@@ -66,7 +105,7 @@
     <div class="alert alert--error" role="alert">{{ errorMessage() }}</div>
   }
 
-  <!-- Files table -->
+  <!-- Unified storage table: folders first, then files -->
   <div class="files-card card">
     <div class="table-head">
       <span class="col-name">Имя</span>
@@ -80,71 +119,199 @@
       <div class="table-empty">
         <span class="text-muted text-sm">Загрузка…</span>
       </div>
-    } @else if (files().length === 0) {
-      <div class="table-empty">
-        <div class="empty-icon" aria-hidden="true">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-            <rect x="6" y="4" width="24" height="32" rx="3" stroke="var(--c-border-strong)" stroke-width="1.5"/>
-            <path d="M12 14h16M12 19h16M12 24h10" stroke="var(--c-border-strong)" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-        </div>
-        <p class="text-muted">Нет файлов. Нажмите «Загрузить» чтобы добавить первый.</p>
-      </div>
     } @else {
-      <ul class="table-list" role="list" [attr.aria-busy]="isLoading()">
-        @for (file of files(); track file.blob_id) {
-          <li class="table-row">
-            <div class="col-name">
-              <div class="file-icon" aria-hidden="true">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <rect x="2" y="1" width="9" height="14" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
-                  <path d="M5 5h5M5 7.5h5M5 10h3" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
-                  <path d="M9 1v4h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+      @if (!hasFolders() && !hasFiles() && !isCreatingFolder()) {
+        <div class="table-empty">
+          <div class="empty-icon" aria-hidden="true">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <rect x="6" y="4" width="24" height="32" rx="3" stroke="var(--c-border-strong)" stroke-width="1.5"/>
+              <path d="M12 14h16M12 19h16M12 24h10" stroke="var(--c-border-strong)" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <p class="text-muted">Нет файлов. Перетащите сюда или нажмите «Загрузить».</p>
+        </div>
+      } @else {
+        <ul class="table-list" role="list">
+
+          <!-- New folder row (inline create) -->
+          @if (isCreatingFolder()) {
+            <li class="table-row table-row--folder table-row--folder-new" (click)="$event.stopPropagation()">
+              <div class="col-name">
+                <div class="file-icon file-icon--folder" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M1 4.5A1 1 0 0 1 2 3.5h3.586a1 1 0 0 1 .707.293l.914.914A1 1 0 0 0 7.914 5H14a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4.5Z"
+                          fill="currentColor" opacity="0.2" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <div class="folder-create-name">
+                  <input
+                    #newFolderInput
+                    type="text"
+                    class="folder-name-input"
+                    placeholder="Новая папка"
+                    [value]="newFolderName()"
+                    (input)="newFolderName.set($any($event.target).value)"
+                    (keydown.enter)="confirmCreateFolder()"
+                    (keydown.escape)="cancelCreateFolder()"
+                  />
+                  @if (creatingFolderError()) {
+                    <span class="folder-create-error text-sm">{{ creatingFolderError() }}</span>
+                  }
+                </div>
               </div>
-              <span class="file-name" [attr.title]="file.file_name">{{ file.file_name || file.object_key }}</span>
-            </div>
-            <span class="col-type text-secondary text-sm">{{ shortType(file.content_type) }}</span>
-            <span class="col-date text-secondary text-sm">{{ file.created_at | date: 'dd.MM.yyyy' }}</span>
-            <div class="col-actions">
-              <button
-                type="button"
-                class="btn btn--ghost btn--sm btn--icon"
-                [attr.aria-label]="'Скачать ' + file.file_name"
-                (click)="download(file)"
-              >
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-                  <path d="M7.5 2v8M4 7l3.5 3.5L11 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                  <path d="M2 12h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                </svg>
-              </button>
-              <button
-                type="button"
-                class="btn btn--ghost btn--sm btn--icon"
-                [attr.aria-label]="'Управление доступом — ' + file.file_name"
-                (click)="openAccessDialog(file)"
-              >
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-                  <circle cx="11.5" cy="2.5" r="1.5" stroke="currentColor" stroke-width="1.3"/>
-                  <circle cx="3.5" cy="7.5" r="1.5" stroke="currentColor" stroke-width="1.3"/>
-                  <circle cx="11.5" cy="12.5" r="1.5" stroke="currentColor" stroke-width="1.3"/>
-                  <path d="M5 8.4l5 2.7M5 6.6L10 3.9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                </svg>
-              </button>
-              <button
-                type="button"
-                class="btn btn--ghost btn--sm btn--icon btn--icon-danger"
-                [attr.aria-label]="'Удалить ' + file.file_name"
-                (click)="delete(file)"
-              >
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-                  <path d="M2 4h11M5 4V2.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5V4M6 7v4M9 7v4M3.5 4l.8 8a1 1 0 0 0 1 .9h4.4a1 1 0 0 0 1-.9l.8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </button>
-            </div>
-          </li>
-        }
-      </ul>
+              <span class="col-type text-secondary text-sm">Папка</span>
+              <span class="col-date"></span>
+              <div class="col-actions">
+                <button type="button" class="btn btn--ghost btn--sm btn--icon" aria-label="Создать папку"
+                        [disabled]="!newFolderName().trim()" (click)="confirmCreateFolder()">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <path d="M2 7l4 4 6-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <button type="button" class="btn btn--ghost btn--sm btn--icon" aria-label="Отмена"
+                        (mousedown)="cancelCreateFolder()">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            </li>
+          }
+
+          <!-- Folder rows -->
+          @for (folder of folders(); track folder.folder_id) {
+            <li
+              class="table-row table-row--folder"
+              [class.table-row--drag-over]="dragOverFolderId() === folder.folder_id"
+              [class.table-row--dragging]="draggingId() === folder.folder_id"
+              [attr.draggable]="renamingFolderId() !== folder.folder_id ? true : null"
+              [attr.tabindex]="renamingFolderId() !== folder.folder_id ? 0 : null"
+              role="button"
+              [attr.aria-label]="'Открыть папку ' + folder.name"
+              (click)="navigateIntoFolder(folder)"
+              (keydown.enter)="navigateIntoFolder(folder)"
+              (keydown.space)="navigateIntoFolder(folder); $event.preventDefault()"
+              (dragstart)="onFolderDragStart($event, folder.folder_id)"
+              (dragend)="onDragEnd()"
+              (dragover)="onFolderDragOver($event, folder.folder_id)"
+              (dragleave)="onFolderDragLeave($event, folder.folder_id)"
+              (drop)="onFolderDrop($event, folder.folder_id)"
+            >
+              <div class="col-name">
+                <div class="file-icon file-icon--folder" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M1 4.5A1 1 0 0 1 2 3.5h3.586a1 1 0 0 1 .707.293l.914.914A1 1 0 0 0 7.914 5H14a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4.5Z"
+                          fill="currentColor" opacity="0.2" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                @if (renamingFolderId() === folder.folder_id) {
+                  <input
+                    type="text"
+                    class="folder-name-input folder-rename-input"
+                    [attr.aria-label]="'Переименовать папку ' + folder.name"
+                    [value]="renameFolderName()"
+                    (input)="renameFolderName.set($any($event.target).value)"
+                    (keydown.enter)="confirmRenameFolder(folder)"
+                    (keydown.escape)="cancelRenameFolder()"
+                    (keydown)="$event.stopPropagation()"
+                    (blur)="confirmRenameFolder(folder)"
+                    (click)="$event.stopPropagation()"
+                  />
+                } @else {
+                  <span class="file-name" [title]="folder.name">{{ folder.name }}</span>
+                }
+              </div>
+              <span class="col-type text-secondary text-sm">Папка</span>
+              <span class="col-date text-secondary text-sm">{{ folder.created_at | date: 'dd.MM.yyyy' }}</span>
+              <div class="col-actions" (click)="$event.stopPropagation()">
+                @if (renamingFolderId() !== folder.folder_id) {
+                  <button
+                    type="button"
+                    class="btn btn--ghost btn--sm btn--icon"
+                    [attr.aria-label]="'Переименовать ' + folder.name"
+                    (click)="startRenameFolder(folder, $event)"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                      <path d="M9 2l2 2-7 7H2v-2L9 2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn--ghost btn--sm btn--icon btn--icon-danger"
+                    [attr.aria-label]="'Удалить ' + folder.name"
+                    (click)="deleteFolder(folder, $event)"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                      <path d="M2 3.5h9M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5 6v3M8 6v3M2.5 3.5l.8 7A1 1 0 0 0 4.3 11.5h4.4a1 1 0 0 0 1-.9l.8-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                }
+              </div>
+            </li>
+          }
+
+          <!-- File rows -->
+          @for (file of files(); track file.blob_id) {
+            <li
+              class="table-row"
+              [class.table-row--dragging]="draggingId() === file.blob_id"
+              draggable="true"
+              (dragstart)="onBlobDragStart($event, file.blob_id)"
+              (dragend)="onDragEnd()"
+            >
+              <div class="col-name">
+                <div class="file-icon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="1" width="9" height="14" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+                    <path d="M5 5h5M5 7.5h5M5 10h3" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+                    <path d="M9 1v4h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <span class="file-name" [attr.title]="file.file_name">{{ file.file_name || file.object_key }}</span>
+              </div>
+              <span class="col-type text-secondary text-sm">{{ shortType(file.content_type) }}</span>
+              <span class="col-date text-secondary text-sm">{{ file.created_at | date: 'dd.MM.yyyy' }}</span>
+              <div class="col-actions">
+                <button
+                  type="button"
+                  class="btn btn--ghost btn--sm btn--icon"
+                  [attr.aria-label]="'Скачать ' + file.file_name"
+                  (click)="download(file)"
+                >
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                    <path d="M7.5 2v8M4 7l3.5 3.5L11 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 12h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn--ghost btn--sm btn--icon"
+                  [attr.aria-label]="'Управление доступом — ' + file.file_name"
+                  (click)="openAccessDialog(file)"
+                >
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                    <circle cx="11.5" cy="2.5" r="1.5" stroke="currentColor" stroke-width="1.3"/>
+                    <circle cx="3.5" cy="7.5" r="1.5" stroke="currentColor" stroke-width="1.3"/>
+                    <circle cx="11.5" cy="12.5" r="1.5" stroke="currentColor" stroke-width="1.3"/>
+                    <path d="M5 8.4l5 2.7M5 6.6L10 3.9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn--ghost btn--sm btn--icon btn--icon-danger"
+                  [attr.aria-label]="'Удалить ' + file.file_name"
+                  (click)="delete(file)"
+                >
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                    <path d="M2 4h11M5 4V2.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5V4M6 7v4M9 7v4M3.5 4l.8 8a1 1 0 0 0 1 .9h4.4a1 1 0 0 0 1-.9l.8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+            </li>
+          }
+
+        </ul>
+      }
     }
   </div>
 
@@ -153,9 +320,9 @@
 <!-- Access management dialog -->
 @if (accessFile()) {
   <div class="modal-backdrop" (click)="closeAccessDialog()">
-    <div class="modal-card card" role="dialog" aria-modal="true" aria-labelledby="access-dialog-title" (click)="$event.stopPropagation()">
+    <div class="modal-card card" role="dialog" aria-modal="true" aria-labelledby="access-dialog-title"
+         (click)="$event.stopPropagation()">
 
-      <!-- Header -->
       <div class="modal-header">
         <div class="modal-header__text">
           <h2 class="modal-title" id="access-dialog-title">Управление доступом</h2>
@@ -163,7 +330,8 @@
             {{ accessFile()!.file_name }}
           </p>
         </div>
-        <button type="button" class="btn btn--ghost btn--sm btn--icon modal-close" aria-label="Закрыть" (click)="closeAccessDialog()">
+        <button type="button" class="btn btn--ghost btn--sm btn--icon modal-close"
+                aria-label="Закрыть" (click)="closeAccessDialog()">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
@@ -172,7 +340,6 @@
 
       <hr class="modal-divider">
 
-      <!-- Add person -->
       <div class="modal-section">
         <p class="section-label">Открыть доступ</p>
         <div class="add-row">
@@ -203,20 +370,20 @@
 
       <hr class="modal-divider">
 
-      <!-- Current access list -->
       <div class="modal-section">
         <p class="section-label">
           Кто имеет доступ
-          @if (fileShares().length > 0) {
+          @if (hasShares()) {
             <span class="section-count">{{ fileShares().length }}</span>
           }
         </p>
 
         @if (isLoadingShares()) {
           <p class="text-muted text-sm shares-empty">Загрузка…</p>
-        } @else if (fileShares().length === 0) {
-          <p class="text-muted text-sm shares-empty">Никому не открыт доступ.</p>
         } @else {
+          @if (!hasShares()) {
+            <p class="text-muted text-sm shares-empty">Никому не открыт доступ.</p>
+          } @else {
           <ul class="shares-list" role="list">
             @for (share of fileShares(); track share.share_id) {
               <li class="share-row">
@@ -247,6 +414,7 @@
               </li>
             }
           </ul>
+          }
         }
       </div>
 

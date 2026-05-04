@@ -14,49 +14,53 @@
 .sessions-alert { margin: 12px 20px 0; }
 
 .sessions-empty {
-  padding: 32px 20px;
+  padding: 40px 20px;
   text-align: center;
 }
 
-.sessions-list {
-  list-style: none;
-}
+.sessions-list { list-style: none; }
 
+/* ─── Session row ─────────────────────────────────────────────────────────── */
 .session-row {
   display: grid;
   grid-template-columns: 40px 1fr auto;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   padding: 14px 20px;
   border-bottom: 1px solid var(--c-border);
-  transition: background 0.1s;
+  transition: background var(--t-fast);
 
   &:last-child { border-bottom: none; }
   &:hover { background: var(--c-surface-hover); }
 
   &--current {
     background: var(--c-primary-subtle);
-    &:hover { background: #dceeff; }
+    &:hover { background: var(--c-primary-light); }
   }
 }
 
+/* ─── Device icon ─────────────────────────────────────────────────────────── */
 .session-icon {
   width: 40px;
   height: 40px;
   border-radius: var(--r-md);
   background: var(--c-surface-hover);
+  border: 1px solid var(--c-border);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--c-text-secondary);
   flex-shrink: 0;
+  transition: background var(--t), border-color var(--t), color var(--t);
 
   .session-row--current & {
-    background: var(--c-primary-border);
+    background: var(--c-primary-subtle);
+    border-color: var(--c-primary-border);
     color: var(--c-primary);
   }
 }
 
+/* ─── Session info ────────────────────────────────────────────────────────── */
 .session-info {
   min-width: 0;
   display: flex;
@@ -81,15 +85,18 @@
   flex-wrap: wrap;
 }
 
-.session-meta__dot { opacity: 0.5; }
+.session-meta__dot { opacity: 0.4; }
 
 .session-action { flex-shrink: 0; }
 
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
   .session-row {
     grid-template-columns: 36px 1fr;
     grid-template-rows: auto auto;
   }
+
+  .session-icon { width: 36px; height: 36px; }
 
   .session-action {
     grid-column: 2;

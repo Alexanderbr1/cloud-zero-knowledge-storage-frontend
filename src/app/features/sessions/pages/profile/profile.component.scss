@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .breadcrumb__back {
@@ -14,9 +14,11 @@
   gap: 4px;
   color: var(--c-text-secondary);
   text-decoration: none;
-  transition: color 0.15s;
+  padding: 3px 6px;
+  border-radius: var(--r-sm);
+  transition: color var(--t), background var(--t);
 
-  &:hover { color: var(--c-primary); }
+  &:hover { color: var(--c-primary); background: var(--c-surface-hover); }
   &:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm); }
 }
 
@@ -33,7 +35,7 @@
   align-items: center;
   gap: 16px;
   padding: 20px 24px;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
   flex-wrap: wrap;
 }
 
@@ -50,26 +52,32 @@
   font-size: 20px;
   font-weight: 700;
   border: 2px solid var(--c-primary-border);
+  box-shadow: var(--shadow-primary-ring-xs);
 }
 
 .user-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .user-email {
   font-size: 16px;
   font-weight: 600;
+  letter-spacing: -0.2px;
   color: var(--c-text);
   word-break: break-all;
 }
 
 .user-actions { margin-left: auto; }
 
-/* ─── Sections ────────────────────────────────────────────────────────────── */
+/* ─── Section title ───────────────────────────────────────────────────────── */
 .section-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
+  letter-spacing: -0.2px;
   color: var(--c-text);
   margin-bottom: 12px;
 }

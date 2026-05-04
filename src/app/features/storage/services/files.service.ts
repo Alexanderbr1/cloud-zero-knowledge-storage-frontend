@@ -4,6 +4,7 @@ import { Observable, from, map, switchMap, throwError } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
 import { FileItem } from '../models/file-item.model';
+import { FolderItem } from '../models/folder.model';
 import { CryptoService } from '../../../core/services/crypto.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { triggerBrowserDownload } from '../../../core/utils/browser.utils';
@@ -13,6 +14,7 @@ interface PresignPutRequest {
   content_type: string;
   encrypted_file_key: string;
   file_iv: string;
+  folder_id?: string;
 }
 
 interface PresignPutResponse {
@@ -37,6 +39,10 @@ interface ListBlobsResponse {
   items: FileItem[];
 }
 
+interface ListFoldersResponse {
+  items: FolderItem[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class FilesService {
   private readonly http = inject(HttpClient);
@@ -44,15 +50,26 @@ export class FilesService {
   private readonly auth = inject(AuthService);
   private readonly baseUrl = `${environment.apiBaseUrl}/storage`;
 
-  listFiles(): Observable<FileItem[]> {
+  // ─── Blobs ────────────────────────────────────────────────────────────────
+
+  listFilesInFolder(folderId: string | null): Observable<FileItem[]> {
+    const param = folderId === null ? 'root' : folderId;
     return this.http
-      .get<ListBlobsResponse>(`${this.baseUrl}/blobs`)
-      .pipe(map((response) => response.items));
+      .get<ListBlobsResponse>(`${this.baseUrl}/blobs`, { params: { folder_id: param } })
+      .pipe(map(r => r.items));
+  }
+
+  moveBlob(blobId: string, folderId: string | null): Observable<void> {
+    return this.http.patch<void>(
+      `${this.baseUrl}/blobs/${encodeURIComponent(blobId)}/folder`,
+      { folder_id: folderId },
+    );
   }
 
   uploadFile(
     file: File,
-    onProgress?: (phase: 'reading' | 'encrypting' | 'uploading', pct: number) => void
+    onProgress?: (phase: 'reading' | 'encrypting' | 'uploading', pct: number) => void,
+    folderId?: string | null,
   ): Observable<PresignPutResponse> {
     const masterKey = this.auth.getMasterKey();
     if (!masterKey) {
@@ -68,66 +85,88 @@ export class FilesService {
           file_name: file.name,
           content_type: contentType,
           encrypted_file_key: wrappedKeyB64,
-          file_iv: ivB64
+          file_iv: ivB64,
+          ...(folderId ? { folder_id: folderId } : {}),
         };
 
         return this.http.post<PresignPutResponse>(`${this.baseUrl}/presign`, payload).pipe(
-          switchMap((presign) => {
+          switchMap(presign => {
             onProgress?.('uploading', 0);
             return this.xhrUpload(
               presign.upload_url,
               presign.http_method || 'PUT',
               presign.content_type || contentType,
               encryptedBuffer,
-              (pct) => onProgress?.('uploading', pct)
+              pct => onProgress?.('uploading', pct),
             ).pipe(map(() => presign));
-          })
+          }),
         );
-      })
+      }),
     );
   }
 
-  /**
-   * Скачивание файла с клиентским дешифрованием:
-   * 1. Получаем presigned GET URL + wrapped key + IV с сервера
-   * 2. Скачиваем зашифрованный blob из MinIO
-   * 3. Разворачиваем файловый ключ мастер-ключом
-   * 4. Дешифруем — GCM автоматически проверяет целостность
-   * 5. Создаём blob URL и тригерим браузерное скачивание
-   *
-   * Если файл был загружен до внедрения шифрования (нет crypto-полей) —
-   * скачиваем как обычно без дешифрования (обратная совместимость).
-   */
   downloadFile(blobId: string, fileName: string): Observable<void> {
     return this.http
       .post<PresignGetResponse>(
         `${this.baseUrl}/blobs/${encodeURIComponent(blobId)}/presign-get`,
-        {}
+        {},
       )
-      .pipe(
-        switchMap((resp) => from(this.fetchAndDecrypt(resp, fileName)))
-      );
+      .pipe(switchMap(resp => from(this.fetchAndDecrypt(resp, fileName))));
   }
 
   deleteFile(blobId: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/blobs/${encodeURIComponent(blobId)}`);
   }
 
-  // ─── Приватные методы ──────────────────────────────────────────────────
+  // ─── Folders ──────────────────────────────────────────────────────────────
+
+  listFolders(parentId: string | null): Observable<FolderItem[]> {
+    const params: Record<string, string> = parentId ? { parent_id: parentId } : {};
+    return this.http
+      .get<ListFoldersResponse>(`${this.baseUrl}/folders`, { params })
+      .pipe(map(r => r.items));
+  }
+
+  createFolder(name: string, parentId: string | null): Observable<FolderItem> {
+    return this.http.post<FolderItem>(`${this.baseUrl}/folders`, {
+      name,
+      parent_id: parentId,
+    });
+  }
+
+  renameFolder(folderId: string, name: string): Observable<FolderItem> {
+    return this.http.patch<FolderItem>(
+      `${this.baseUrl}/folders/${encodeURIComponent(folderId)}`,
+      { name },
+    );
+  }
+
+  moveFolder(folderId: string, newParentId: string | null): Observable<void> {
+    return this.http.patch<void>(
+      `${this.baseUrl}/folders/${encodeURIComponent(folderId)}/move`,
+      { parent_id: newParentId },
+    );
+  }
+
+  deleteFolder(folderId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/folders/${encodeURIComponent(folderId)}`);
+  }
+
+  // ─── Private helpers ──────────────────────────────────────────────────────
 
   private xhrUpload(
     url: string,
     method: string,
     contentType: string,
     body: ArrayBuffer,
-    onProgress?: (pct: number) => void
+    onProgress?: (pct: number) => void,
   ): Observable<void> {
     return new Observable<void>(observer => {
       const xhr = new XMLHttpRequest();
       xhr.open(method, url);
       xhr.setRequestHeader('Content-Type', contentType);
 
-      xhr.upload.addEventListener('progress', (event) => {
+      xhr.upload.addEventListener('progress', event => {
         if (event.lengthComputable) {
           onProgress?.(Math.round((event.loaded / event.total) * 100));
         }
@@ -153,9 +192,9 @@ export class FilesService {
   private async prepareEncryptedUpload(
     file: File,
     masterKey: CryptoKey,
-    onProgress?: (phase: 'reading' | 'encrypting' | 'uploading', pct: number) => void
+    onProgress?: (phase: 'reading' | 'encrypting' | 'uploading', pct: number) => void,
   ): Promise<{ encryptedBuffer: ArrayBuffer; wrappedKeyB64: string; ivB64: string }> {
-    const plaintext = await this.readFileWithProgress(file, (pct) => onProgress?.('reading', pct));
+    const plaintext = await this.readFileWithProgress(file, pct => onProgress?.('reading', pct));
     onProgress?.('encrypting', 0);
     const fileKey = await this.crypto.generateFileKey();
     const { ciphertext, ivB64 } = await this.crypto.encryptFile(plaintext, fileKey);
@@ -166,7 +205,7 @@ export class FilesService {
   private readFileWithProgress(file: File, onProgress: (pct: number) => void): Promise<ArrayBuffer> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onprogress = (event) => {
+      reader.onprogress = event => {
         if (event.lengthComputable) {
           onProgress(Math.round((event.loaded / event.total) * 100));
         }

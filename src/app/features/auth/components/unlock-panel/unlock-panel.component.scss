@@ -10,7 +10,10 @@
   align-items: center;
   justify-content: center;
   padding: 24px 16px;
-  background: var(--c-bg);
+  background:
+    radial-gradient(ellipse 70% 60% at 15% 35%, var(--c-primary-wash) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 50% at 85% 75%, var(--c-primary-wash) 0%, transparent 65%),
+    var(--c-bg);
 }
 
 .auth-card {
@@ -20,7 +23,8 @@
   border: 1px solid var(--c-border);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow-lg);
-  padding: 32px 32px 28px;
+  padding: 36px 32px 28px;
+  animation: scaleIn 0.32s var(--t-spring) both;
 }
 
 .auth-brand {
@@ -31,28 +35,29 @@
 }
 
 .auth-logo {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--r-md);
   background: var(--c-primary);
-  color: #fff;
+  color: var(--c-white);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: var(--shadow-primary-md);
 }
 
 .auth-brand-name {
   font-size: 16px;
   font-weight: 700;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.3px;
   color: var(--c-text);
 }
 
 .auth-title {
   font-size: 22px;
   font-weight: 700;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.4px;
   color: var(--c-text);
   margin-bottom: 8px;
 }
@@ -61,7 +66,7 @@
   font-size: 14px;
   color: var(--c-text-secondary);
   margin-bottom: 24px;
-  line-height: 1.5;
+  line-height: 1.55;
   word-break: break-all;
 }
 
@@ -86,7 +91,6 @@
 .auth-submit {
   margin-top: 6px;
   width: 100%;
-  border-radius: var(--r-md);
 }
 
 .auth-hint {
@@ -107,15 +111,15 @@
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
+  transition: opacity var(--t);
 
-  &:hover { opacity: 0.8; }
+  &:hover { opacity: 0.75; }
 }
 
 @media (max-width: 440px) {
   .auth-card {
-    padding: 24px 20px 22px;
+    padding: 28px 20px 24px;
     border-radius: var(--r-lg);
   }
-
   .auth-title { font-size: 20px; }
 }

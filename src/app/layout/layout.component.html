@@ -1,41 +1,81 @@
+<a href="#main-content" class="skip-link">Перейти к содержимому</a>
+
 <div class="app-shell">
+
   <!-- Top Navigation -->
   <header class="nav" role="banner">
     <div class="nav__inner">
+
       <!-- Logo -->
-      <a routerLink="/files" class="nav__logo" aria-label="Cloud Storage — главная">
+      <a routerLink="/files" class="nav__logo" aria-label="Cloud Storage — главная" (click)="closeMenu()">
         <div class="nav__logo-mark" aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
             <path d="M15.5 8.5a5.5 5.5 0 0 0-11 0A4 4 0 0 0 4 16h12a3.5 3.5 0 0 0-.5-7.5z" fill="currentColor"/>
           </svg>
         </div>
         <span class="nav__logo-text">Cloud</span>
       </a>
 
-      <!-- Nav links -->
+      <!-- Desktop nav links -->
       <nav class="nav__links" aria-label="Основная навигация">
-        <a routerLink="/files" routerLinkActive="nav__link--active" class="nav__link">Файлы</a>
-        <a routerLink="/shared" routerLinkActive="nav__link--active" class="nav__link">Входящие</a>
+        <a routerLink="/files"  routerLinkActive="nav__link--active" class="nav__link">Мой диск</a>
+        <a routerLink="/shared" routerLinkActive="nav__link--active" class="nav__link">Доступные мне</a>
       </nav>
 
       <!-- Right side -->
       <div class="nav__right">
-        <!-- Profile avatar -->
+
+        <!-- Profile avatar (desktop) -->
         <a
           routerLink="/profile"
-          class="nav__avatar"
-          [class.nav__avatar--active]="false"
+          class="nav__avatar nav__avatar--desktop"
+          routerLinkActive="nav__avatar--active"
           [attr.aria-label]="'Профиль: ' + userEmail()"
           [attr.title]="userEmail()"
+        >{{ userInitial() }}</a>
+
+        <!-- Hamburger (mobile) -->
+        <button
+          type="button"
+          class="nav__hamburger"
+          [class.nav__hamburger--open]="isMenuOpen()"
+          [attr.aria-expanded]="isMenuOpen()"
+          aria-controls="mobile-nav"
+          aria-label="Открыть меню"
+          (click)="toggleMenu()"
         >
-          {{ userInitial() }}
-        </a>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </button>
+
       </div>
     </div>
   </header>
 
+  <!-- Mobile nav dropdown -->
+  @if (isMenuOpen()) {
+    <div
+      class="mobile-nav"
+      id="mobile-nav"
+      role="navigation"
+      aria-label="Мобильное меню"
+    >
+      <a routerLink="/files"   routerLinkActive="mobile-nav__link--active" class="mobile-nav__link" (click)="closeMenu()">Мой диск</a>
+      <a routerLink="/shared"  routerLinkActive="mobile-nav__link--active" class="mobile-nav__link" (click)="closeMenu()">Доступные мне</a>
+      <hr class="mobile-nav__divider">
+      <a routerLink="/profile" routerLinkActive="mobile-nav__link--active" class="mobile-nav__link" (click)="closeMenu()">
+        <span class="mobile-nav__avatar" aria-hidden="true">{{ userInitial() }}</span>
+        Профиль
+      </a>
+    </div>
+    <!-- Backdrop -->
+    <div class="mobile-nav-backdrop" aria-hidden="true" (click)="closeMenu()"></div>
+  }
+
   <!-- Page content -->
-  <main class="app-content" role="main">
+  <main class="app-content" role="main" id="main-content" tabindex="-1">
     <router-outlet />
   </main>
+
 </div>
