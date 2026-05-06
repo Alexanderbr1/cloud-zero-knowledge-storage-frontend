@@ -14,6 +14,7 @@ interface PresignPutRequest {
   content_type: string;
   encrypted_file_key: string;
   file_iv: string;
+  file_size: number;
   folder_id?: string;
 }
 
@@ -43,6 +44,11 @@ interface ListFoldersResponse {
   items: FolderItem[];
 }
 
+interface SearchResponse {
+  blobs: FileItem[];
+  folders: FolderItem[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class FilesService {
   private readonly http = inject(HttpClient);
@@ -66,6 +72,13 @@ export class FilesService {
     );
   }
 
+  renameFile(blobId: string, name: string): Observable<void> {
+    return this.http.patch<void>(
+      `${this.baseUrl}/blobs/${encodeURIComponent(blobId)}`,
+      { name },
+    );
+  }
+
   uploadFile(
     file: File,
     onProgress?: (phase: 'reading' | 'encrypting' | 'uploading', pct: number) => void,
@@ -86,6 +99,7 @@ export class FilesService {
           content_type: contentType,
           encrypted_file_key: wrappedKeyB64,
           file_iv: ivB64,
+          file_size: file.size,
           ...(folderId ? { folder_id: folderId } : {}),
         };
 
@@ -150,6 +164,10 @@ export class FilesService {
 
   deleteFolder(folderId: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/folders/${encodeURIComponent(folderId)}`);
+  }
+
+  search(query: string): Observable<SearchResponse> {
+    return this.http.get<SearchResponse>(`${this.baseUrl}/search`, { params: { q: query } });
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────────

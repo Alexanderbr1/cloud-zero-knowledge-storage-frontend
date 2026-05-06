@@ -5,14 +5,20 @@ import {
   ViewChild, computed, inject, signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, catchError, finalize, forkJoin, of, switchMap } from 'rxjs';
+import { Subject, catchError, debounceTime, distinctUntilChanged, finalize, forkJoin, of, switchMap } from 'rxjs';
 
 import { AuthService } from '../../../../core/services/auth.service';
 import { ShareItem, SharingService } from '../../../../core/services/sharing.service';
+import { ToastService } from '../../../../core/services/toast.service';
 import { FileItem } from '../../models/file-item.model';
 import { BreadcrumbItem, FolderItem } from '../../models/folder.model';
 import { FilesService } from '../../services/files.service';
 import { shortMimeType } from '../../../../core/utils/browser.utils';
+
+interface SearchResults {
+  blobs: FileItem[];
+  folders: FolderItem[];
+}
 
 @Component({
   selector: 'app-files',
@@ -26,6 +32,7 @@ export class FilesComponent implements OnInit {
   private readonly sharingService = inject(SharingService);
   private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   @ViewChild('fileInput')       private fileInputRef?: ElementRef<HTMLInputElement>;
   @ViewChild('shareEmailInput') private shareEmailInputRef?: ElementRef<HTMLInputElement>;
@@ -40,14 +47,77 @@ export class FilesComponent implements OnInit {
   readonly uploadProgress   = signal(0);
   readonly isUploading      = computed(() => this.uploadPhase() !== 'idle');
   readonly selectedFile     = signal<File | null>(null);
-  readonly actionMessage    = signal('');
-  readonly errorMessage     = signal('');
 
   // ─── Folder navigation ────────────────────────────────────────────────────
 
   readonly currentFolderId = signal<string | null>(null);
   readonly folders         = signal<FolderItem[]>([]);
   readonly breadcrumbs     = signal<BreadcrumbItem[]>([{ folder_id: null, name: 'Мои файлы' }]);
+
+  // ─── Search & sort ────────────────────────────────────────────────────────
+
+  readonly searchQuery   = signal('');
+  readonly searchResults = signal<SearchResults | null>(null);
+  readonly isSearching   = signal(false);
+  readonly sortField     = signal<'name' | 'date' | 'size' | 'type'>('date');
+  readonly sortDir       = signal<'asc' | 'desc'>('desc');
+
+  private readonly searchSubject = new Subject<string>();
+
+  setSort(field: 'name' | 'date' | 'size' | 'type'): void {
+    if (this.sortField() === field) {
+      this.sortDir.update(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortField.set(field);
+      this.sortDir.set(field === 'date' ? 'desc' : 'asc');
+    }
+  }
+
+  onSearchInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.searchQuery.set(value);
+    const trimmed = value.trim();
+    if (trimmed.length >= 2) {
+      this.searchSubject.next(trimmed);
+    } else {
+      this.searchResults.set(null);
+    }
+  }
+
+  clearSearch(): void {
+    this.searchQuery.set('');
+    this.searchResults.set(null);
+  }
+
+  readonly filteredFolders = computed(() => {
+    const results = this.searchResults();
+    if (results !== null) return results.folders;
+    const q     = this.searchQuery().trim().toLowerCase();
+    const field = this.sortField();
+    const dir   = this.sortDir() === 'asc' ? 1 : -1;
+    const list  = q ? this.folders().filter(f => f.name.toLowerCase().includes(q)) : [...this.folders()];
+    return list.sort((a, b) => {
+      if (field === 'date') return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      return dir * a.name.localeCompare(b.name);
+    });
+  });
+
+  readonly filteredFiles = computed(() => {
+    const results = this.searchResults();
+    if (results !== null) return results.blobs;
+    const q     = this.searchQuery().trim().toLowerCase();
+    const field = this.sortField();
+    const dir   = this.sortDir() === 'asc' ? 1 : -1;
+    const list  = q ? this.files().filter(f => f.file_name.toLowerCase().includes(q)) : [...this.files()];
+    return list.sort((a, b) => {
+      switch (field) {
+        case 'name': return dir * a.file_name.localeCompare(b.file_name);
+        case 'date': return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        case 'size': return dir * (a.file_size - b.file_size);
+        case 'type': return dir * a.content_type.localeCompare(b.content_type);
+      }
+    });
+  });
 
   // ─── Derived state (used in @if conditions to avoid Angular 17 tmp-variable
   // scoping bug: calling the same signal in @if condition + @for iterable
@@ -57,6 +127,7 @@ export class FilesComponent implements OnInit {
   readonly hasFiles       = computed(() => this.files().length > 0);
   readonly hasBreadcrumbs = computed(() => this.breadcrumbs().length > 1);
   readonly hasShares      = computed(() => this.fileShares().length > 0);
+  readonly hasResults     = computed(() => this.filteredFolders().length > 0 || this.filteredFiles().length > 0);
 
   // ─── Create folder ────────────────────────────────────────────────────────
 
@@ -68,6 +139,11 @@ export class FilesComponent implements OnInit {
 
   readonly renamingFolderId = signal<string | null>(null);
   readonly renameFolderName = signal('');
+
+  // ─── Rename file ──────────────────────────────────────────────────────────
+
+  readonly renamingFileId = signal<string | null>(null);
+  readonly renameFileName  = signal('');
 
   // ─── Drag-and-drop ────────────────────────────────────────────────────────
 
@@ -91,22 +167,39 @@ export class FilesComponent implements OnInit {
   // ─── Lifecycle ────────────────────────────────────────────────────────────
 
   ngOnInit(): void {
+    this.searchSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(query => {
+        this.isSearching.set(true);
+        return this.filesService.search(query).pipe(
+          finalize(() => this.isSearching.set(false)),
+          catchError(() => {
+            this.toast.error('Поиск не удался.');
+            return of(null);
+          }),
+        );
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(results => {
+      this.searchResults.set(results);
+    });
+
     // switchMap cancels any in-flight requests when a new loadContent() fires,
     // preventing stale responses from overwriting fresher data.
     this.loadSubject.pipe(
       switchMap(() => {
         const folderId = this.currentFolderId();
-        console.debug('[load] GET start — folderId:', folderId);
         return forkJoin({
           folders: this.filesService.listFolders(folderId).pipe(
             catchError(() => {
-              this.errorMessage.set('Не удалось загрузить папки.');
+              this.toast.error('Не удалось загрузить папки.');
               return of([] as FolderItem[]);
             }),
           ),
           files: this.filesService.listFilesInFolder(folderId).pipe(
             catchError(() => {
-              this.errorMessage.set('Не удалось загрузить файлы.');
+              this.toast.error('Не удалось загрузить файлы.');
               return of([] as FileItem[]);
             }),
           ),
@@ -114,7 +207,6 @@ export class FilesComponent implements OnInit {
       }),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe(({ folders, files }) => {
-      console.debug('[load] GET done — folderId:', this.currentFolderId(), '| files:', files.length, '| folders:', folders.length);
       this.folders.set(folders);
       this.files.set(files);
       this.isLoading.set(false);
@@ -126,6 +218,7 @@ export class FilesComponent implements OnInit {
   @HostListener('document:keydown.escape')
   onEscape(): void {
     if (this.accessFile())         { this.closeAccessDialog(); return; }
+    if (this.renamingFileId())     { this.cancelRenameFile(); return; }
     if (this.renamingFolderId())   { this.cancelRenameFolder(); return; }
     if (this.isCreatingFolder())   { this.cancelCreateFolder(); }
   }
@@ -134,8 +227,6 @@ export class FilesComponent implements OnInit {
 
   loadContent(): void {
     this.isLoading.set(true);
-    this.actionMessage.set('');
-    this.errorMessage.set('');
     this.loadSubject.next();
   }
 
@@ -143,7 +234,7 @@ export class FilesComponent implements OnInit {
 
   navigateIntoFolder(folder: FolderItem): void {
     if (this.renamingFolderId() === folder.folder_id) return;
-    console.debug('[navigate] into folder:', folder.folder_id, folder.name);
+    this.clearSearch();
     this.currentFolderId.set(folder.folder_id);
     this.breadcrumbs.update(crumbs => [...crumbs, { folder_id: folder.folder_id, name: folder.name }]);
     this.isCreatingFolder.set(false);
@@ -153,6 +244,7 @@ export class FilesComponent implements OnInit {
   navigateToBreadcrumb(index: number): void {
     const crumbs = this.breadcrumbs();
     const crumb  = crumbs[index];
+    this.clearSearch();
     this.currentFolderId.set(crumb.folder_id);
     this.breadcrumbs.set(crumbs.slice(0, index + 1));
     this.isCreatingFolder.set(false);
@@ -163,6 +255,7 @@ export class FilesComponent implements OnInit {
 
   openCreateFolder(): void {
     this.cancelRenameFolder();
+    this.cancelRenameFile();
     this.isCreatingFolder.set(true);
     this.newFolderName.set('');
     this.creatingFolderError.set('');
@@ -199,6 +292,7 @@ export class FilesComponent implements OnInit {
   startRenameFolder(folder: FolderItem, event: Event): void {
     event.stopPropagation();
     this.cancelCreateFolder();
+    this.cancelRenameFile();
     this.renamingFolderId.set(folder.folder_id);
     this.renameFolderName.set(folder.name);
     setTimeout(() => {
@@ -232,8 +326,50 @@ export class FilesComponent implements OnInit {
         );
       },
       error: (err: HttpErrorResponse) => {
-        this.errorMessage.set(
+        this.toast.error(
           err.status === 409 ? 'Папка с таким именем уже существует.' : 'Не удалось переименовать папку.',
+        );
+      },
+    });
+  }
+
+  // ─── Rename file ──────────────────────────────────────────────────────────
+
+  startRenameFile(file: FileItem, event: Event): void {
+    event.stopPropagation();
+    this.cancelCreateFolder();
+    this.cancelRenameFolder();
+    this.renamingFileId.set(file.blob_id);
+    this.renameFileName.set(file.file_name);
+    setTimeout(() => {
+      const input = document.querySelector<HTMLInputElement>('.file-rename-input');
+      if (input) { input.focus(); input.select(); }
+    });
+  }
+
+  cancelRenameFile(): void {
+    this.renamingFileId.set(null);
+    this.renameFileName.set('');
+  }
+
+  confirmRenameFile(file: FileItem): void {
+    if (this.renamingFileId() !== file.blob_id) return;
+    const name = this.renameFileName().trim();
+    if (!name || name === file.file_name) { this.cancelRenameFile(); return; }
+
+    this.cancelRenameFile();
+
+    this.filesService.renameFile(file.blob_id, name).pipe(
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: () => {
+        this.files.update(list =>
+          list.map(f => f.blob_id === file.blob_id ? { ...f, file_name: name } : f),
+        );
+      },
+      error: (err: HttpErrorResponse) => {
+        this.toast.error(
+          err.status === 404 ? 'Файл не найден.' : `Не удалось переименовать «${file.file_name}».`,
         );
       },
     });
@@ -248,10 +384,10 @@ export class FilesComponent implements OnInit {
     ).subscribe({
       next: () => {
         this.folders.update(list => list.filter(f => f.folder_id !== folder.folder_id));
-        this.actionMessage.set(`Папка «${folder.name}» удалена.`);
+        this.toast.success(`Папка «${folder.name}» удалена.`);
       },
       error: (err: HttpErrorResponse) => {
-        this.errorMessage.set(
+        this.toast.error(
           err.status === 409
             ? `Папка «${folder.name}» не пуста. Удалите содержимое.`
             : `Не удалось удалить папку «${folder.name}».`,
@@ -315,28 +451,23 @@ export class FilesComponent implements OnInit {
   private moveBlobToFolder(blobId: string, targetFolderId: string): void {
     const sourceFolderId = this.currentFolderId();
     const file = this.files().find(f => f.blob_id === blobId);
-    console.debug('[moveBlob] start — blobId:', blobId, '| targetFolderId:', targetFolderId, '| sourceFolderId:', sourceFolderId, '| file found:', !!file);
     if (!file) return;
 
     this.files.update(list => list.filter(f => f.blob_id !== blobId));
-    console.debug('[moveBlob] optimistic remove done, sending PATCH...');
 
     this.filesService.moveBlob(blobId, targetFolderId).pipe(
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: () => {
-        console.debug('[moveBlob] PATCH success — currentFolderId:', this.currentFolderId(), '| targetFolderId:', targetFolderId);
         if (this.currentFolderId() === targetFolderId) {
-          console.debug('[moveBlob] user is in target folder, reloading content...');
           this.loadContent();
         }
       },
-      error: (err: unknown) => {
-        console.error('[moveBlob] PATCH error:', err, '| currentFolderId:', this.currentFolderId(), '| sourceFolderId:', sourceFolderId);
+      error: () => {
         if (this.currentFolderId() === sourceFolderId) {
           this.files.update(list => [...list, file]);
         }
-        this.errorMessage.set(`Не удалось переместить «${file.file_name}».`);
+        this.toast.error(`Не удалось переместить «${file.file_name}».`);
       },
     });
   }
@@ -360,7 +491,7 @@ export class FilesComponent implements OnInit {
         if (this.currentFolderId() === sourceFolderId) {
           this.folders.update(list => [...list, folder]);
         }
-        this.errorMessage.set(`Не удалось переместить папку «${folder.name}».`);
+        this.toast.error(`Не удалось переместить папку «${folder.name}».`);
       },
     });
   }
@@ -377,8 +508,6 @@ export class FilesComponent implements OnInit {
     const file  = input.files?.item(0) ?? null;
     if (!file) return;
     this.selectedFile.set(file);
-    this.actionMessage.set('');
-    this.errorMessage.set('');
     this.upload();
   }
 
@@ -391,8 +520,6 @@ export class FilesComponent implements OnInit {
     const file = this.selectedFile();
     if (!file) return;
 
-    this.actionMessage.set('');
-    this.errorMessage.set('');
     this.uploadPhase.set('reading');
     this.uploadProgress.set(0);
 
@@ -412,17 +539,17 @@ export class FilesComponent implements OnInit {
       )
       .subscribe({
         next: () => {
-          this.actionMessage.set(`Файл «${file.name}» загружен.`);
+          this.toast.success(`Файл «${file.name}» загружен.`);
           this.selectedFile.set(null);
           this.loadContent();
         },
         error: (err: unknown) => {
           if (this.isMasterKeyMissing(err)) {
             this.auth.clearAccess();
-            this.errorMessage.set('Сессия истекла — войдите снова.');
+            this.toast.error('Сессия истекла — войдите снова.');
             return;
           }
-          this.errorMessage.set('Не удалось загрузить файл.');
+          this.toast.error('Не удалось загрузить файл.');
         },
       });
   }
@@ -430,32 +557,30 @@ export class FilesComponent implements OnInit {
   // ─── File download / delete ───────────────────────────────────────────────
 
   download(file: FileItem): void {
-    this.errorMessage.set('');
     this.filesService.downloadFile(file.blob_id, file.file_name).pipe(
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: () => this.actionMessage.set(`Файл «${file.file_name}» скачан.`),
+      next: () => this.toast.success(`Файл «${file.file_name}» скачан.`),
       error: (err: unknown) => {
         if (this.isMasterKeyMissing(err)) {
           this.auth.clearAccess();
-          this.errorMessage.set('Сессия истекла — войдите снова.');
+          this.toast.error('Сессия истекла — войдите снова.');
           return;
         }
-        this.errorMessage.set(`Не удалось скачать «${file.file_name}».`);
+        this.toast.error(`Не удалось скачать «${file.file_name}».`);
       },
     });
   }
 
   delete(file: FileItem): void {
-    this.errorMessage.set('');
     this.filesService.deleteFile(file.blob_id).pipe(
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: () => {
-        this.actionMessage.set(`Файл «${file.file_name}» удалён.`);
+        this.toast.success(`Файл «${file.file_name}» удалён.`);
         this.loadContent();
       },
-      error: () => this.errorMessage.set(`Не удалось удалить «${file.file_name}».`),
+      error: () => this.toast.error(`Не удалось удалить «${file.file_name}».`),
     });
   }
 
@@ -466,8 +591,6 @@ export class FilesComponent implements OnInit {
     this.fileShares.set([]);
     this.shareEmail.set('');
     this.shareError.set('');
-    this.actionMessage.set('');
-    this.errorMessage.set('');
     this.loadFileShares(file.blob_id);
     setTimeout(() => this.shareEmailInputRef?.nativeElement.focus());
   }
@@ -512,7 +635,7 @@ export class FilesComponent implements OnInit {
       error: (err: unknown) => {
         if (this.isMasterKeyMissing(err)) {
           this.auth.clearAccess();
-          this.errorMessage.set('Сессия истекла — войдите снова.');
+          this.toast.error('Сессия истекла — войдите снова.');
           this.closeAccessDialog();
           return;
         }

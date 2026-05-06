@@ -34,6 +34,36 @@
     />
   </div>
 
+  <!-- Search -->
+  <div class="search-bar">
+    <svg class="search-bar__icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.4"/>
+      <path d="M11 11l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    </svg>
+    <input
+      type="search"
+      class="search-bar__input"
+      placeholder="Глобальный поиск по файлам и папкам"
+      [value]="searchQuery()"
+      (input)="onSearchInput($event)"
+      aria-label="Поиск файлов и папок"
+    />
+    @if (isSearching()) {
+      <span class="search-bar__spinner" aria-label="Поиск…">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="spin" aria-hidden="true">
+          <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6" stroke-dasharray="20 12"/>
+        </svg>
+      </span>
+    } @else if (searchQuery()) {
+      <button type="button" class="search-bar__clear" aria-label="Очистить поиск"
+              (click)="clearSearch()">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+          <path d="M1 1l9 9M10 1L1 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </button>
+    }
+  </div>
+
   <!-- Breadcrumb -->
   @if (hasBreadcrumbs()) {
     <nav class="breadcrumb" aria-label="Навигация по папкам">
@@ -97,20 +127,33 @@
     </div>
   }
 
-  <!-- Feedback messages -->
-  @if (actionMessage()) {
-    <div class="alert alert--success" role="status">{{ actionMessage() }}</div>
-  }
-  @if (errorMessage()) {
-    <div class="alert alert--error" role="alert">{{ errorMessage() }}</div>
-  }
-
   <!-- Unified storage table: folders first, then files -->
   <div class="files-card card">
     <div class="table-head">
-      <span class="col-name">Имя</span>
-      <span class="col-type">Тип</span>
-      <span class="col-date">Дата</span>
+      <span class="col-name col--sortable" [class.col--active]="sortField() === 'name'" (click)="setSort('name')">
+        Имя
+        <svg class="sort-icon" [class.sort-icon--up]="sortDir() === 'asc'" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M5 8V2M2 5l3-3 3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="col-type col--sortable" [class.col--active]="sortField() === 'type'" (click)="setSort('type')">
+        Тип
+        <svg class="sort-icon" [class.sort-icon--up]="sortDir() === 'asc'" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M5 8V2M2 5l3-3 3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="col-size col--sortable" [class.col--active]="sortField() === 'size'" (click)="setSort('size')">
+        Размер
+        <svg class="sort-icon" [class.sort-icon--up]="sortDir() === 'asc'" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M5 8V2M2 5l3-3 3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="col-date col--sortable" [class.col--active]="sortField() === 'date'" (click)="setSort('date')">
+        Дата
+        <svg class="sort-icon" [class.sort-icon--up]="sortDir() === 'asc'" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M5 8V2M2 5l3-3 3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
       <span class="col-actions"></span>
     </div>
     <hr class="divider">
@@ -129,6 +172,10 @@
             </svg>
           </div>
           <p class="text-muted">Нет файлов. Перетащите сюда или нажмите «Загрузить».</p>
+        </div>
+      } @else if (searchQuery() && !isSearching() && !hasResults() && !isCreatingFolder()) {
+        <div class="table-empty">
+          <p class="text-muted">Ничего не найдено по запросу «{{ searchQuery() }}».</p>
         </div>
       } @else {
         <ul class="table-list" role="list">
@@ -160,6 +207,7 @@
                 </div>
               </div>
               <span class="col-type text-secondary text-sm">Папка</span>
+              <span class="col-size"></span>
               <span class="col-date"></span>
               <div class="col-actions">
                 <button type="button" class="btn btn--ghost btn--sm btn--icon" aria-label="Создать папку"
@@ -179,7 +227,7 @@
           }
 
           <!-- Folder rows -->
-          @for (folder of folders(); track folder.folder_id) {
+          @for (folder of filteredFolders(); track folder.folder_id) {
             <li
               class="table-row table-row--folder"
               [class.table-row--drag-over]="dragOverFolderId() === folder.folder_id"
@@ -222,6 +270,7 @@
                 }
               </div>
               <span class="col-type text-secondary text-sm">Папка</span>
+              <span class="col-size text-secondary text-sm">{{ folder.total_size > 0 ? formatSize(folder.total_size) : '—' }}</span>
               <span class="col-date text-secondary text-sm">{{ folder.created_at | date: 'dd.MM.yyyy' }}</span>
               <div class="col-actions" (click)="$event.stopPropagation()">
                 @if (renamingFolderId() !== folder.folder_id) {
@@ -251,11 +300,11 @@
           }
 
           <!-- File rows -->
-          @for (file of files(); track file.blob_id) {
+          @for (file of filteredFiles(); track file.blob_id) {
             <li
               class="table-row"
               [class.table-row--dragging]="draggingId() === file.blob_id"
-              draggable="true"
+              [attr.draggable]="renamingFileId() !== file.blob_id ? true : null"
               (dragstart)="onBlobDragStart($event, file.blob_id)"
               (dragend)="onDragEnd()"
             >
@@ -267,11 +316,48 @@
                     <path d="M9 1v4h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                 </div>
-                <span class="file-name" [attr.title]="file.file_name">{{ file.file_name || file.object_key }}</span>
+                @if (renamingFileId() === file.blob_id) {
+                  <input
+                    type="text"
+                    class="folder-name-input file-rename-input"
+                    [attr.aria-label]="'Переименовать файл ' + file.file_name"
+                    [value]="renameFileName()"
+                    (input)="renameFileName.set($any($event.target).value)"
+                    (keydown.enter)="confirmRenameFile(file)"
+                    (keydown.escape)="cancelRenameFile()"
+                    (keydown)="$event.stopPropagation()"
+                    (blur)="confirmRenameFile(file)"
+                    (click)="$event.stopPropagation()"
+                  />
+                } @else {
+                  <div class="file-name-wrap">
+                    <span class="file-name" [attr.title]="file.file_name">{{ file.file_name || file.object_key }}</span>
+                    @if (file.folder_name) {
+                      <span class="file-location text-muted">
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                          <path d="M1 3A.75.75 0 0 1 1.75 2h2.086a.75.75 0 0 1 .53.22l.634.634A.75.75 0 0 0 5.53 3H8.25A.75.75 0 0 1 9 3.75v4.5A.75.75 0 0 1 8.25 9h-6.5A.75.75 0 0 1 1 8.25V3Z"
+                                stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>
+                        </svg>
+                        {{ file.folder_name }}
+                      </span>
+                    }
+                  </div>
+                }
               </div>
               <span class="col-type text-secondary text-sm">{{ shortType(file.content_type) }}</span>
+              <span class="col-size text-secondary text-sm">{{ formatSize(file.file_size) }}</span>
               <span class="col-date text-secondary text-sm">{{ file.created_at | date: 'dd.MM.yyyy' }}</span>
-              <div class="col-actions">
+              <div class="col-actions" (click)="$event.stopPropagation()">
+                <button
+                  type="button"
+                  class="btn btn--ghost btn--sm btn--icon"
+                  [attr.aria-label]="'Переименовать ' + file.file_name"
+                  (click)="startRenameFile(file, $event)"
+                >
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                    <path d="M9 2l2 2-7 7H2v-2L9 2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+                  </svg>
+                </button>
                 <button
                   type="button"
                   class="btn btn--ghost btn--sm btn--icon"

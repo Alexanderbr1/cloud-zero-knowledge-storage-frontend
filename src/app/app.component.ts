@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, Validators } from '@angular/forms';
 import { Router, RouterOutlet } from '@angular/router';
@@ -7,11 +7,12 @@ import { finalize } from 'rxjs';
 import { AuthService } from './core/services/auth.service';
 import { AuthPanelComponent } from './features/auth/components/auth-panel/auth-panel.component';
 import { UnlockPanelComponent } from './features/auth/components/unlock-panel/unlock-panel.component';
+import { ToastComponent } from './core/components/toast/toast.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, AuthPanelComponent, UnlockPanelComponent],
+  imports: [RouterOutlet, AuthPanelComponent, UnlockPanelComponent, ToastComponent],
   template: `
     @switch (appState()) {
       @case ('checking') {
@@ -40,6 +41,7 @@ import { UnlockPanelComponent } from './features/auth/components/unlock-panel/un
         <router-outlet />
       }
     }
+    <app-toast />
   `,
   styles: [`
     .app-loading {
@@ -64,15 +66,6 @@ export class AppComponent implements OnInit {
     return this.restoring() ? 'checking' : 'login';
   });
 
-  constructor() {
-    effect(() => {
-      console.log('[AppState]', this.appState(),
-        '| isAuthenticated:', this.auth.isAuthenticated(),
-        '| isUnlocked:', this.auth.isUnlocked(),
-        '| restoring:', this.restoring());
-    });
-  }
-
   readonly authMode = signal<'login' | 'register'>('login');
   readonly isSubmitting = signal(false);
   readonly errorMessage = signal('');
@@ -85,15 +78,11 @@ export class AppComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    console.log('[ngOnInit] hadSession:', this.auth.hadSession());
     if (!this.auth.hadSession()) {
-      console.log('[ngOnInit] no prior session → restoring=false');
       this.restoring.set(false);
       return;
     }
-    console.log('[ngOnInit] calling tryRestoreSession...');
-    this.auth.tryRestoreSession().subscribe((ok) => {
-      console.log('[ngOnInit] tryRestoreSession result:', ok);
+    this.auth.tryRestoreSession().subscribe(() => {
       this.restoring.set(false);
     });
   }
@@ -149,16 +138,13 @@ export class AppComponent implements OnInit {
   }
 
   submitUnlock(password: string): void {
-    console.log('[submitUnlock] start');
     this.errorMessage.set('');
     this.isSubmitting.set(true);
     this.auth.unlockSession(password).then(
       () => {
-        console.log('[submitUnlock] success | isUnlocked:', this.auth.isUnlocked(), '| appState:', this.appState());
         this.isSubmitting.set(false);
       },
       (err: unknown) => {
-        console.error('[submitUnlock] error:', err);
         this.isSubmitting.set(false);
         this.errorMessage.set(
           err instanceof Error && err.message
