@@ -11,7 +11,7 @@ export class SessionsService {
   private readonly base = `${environment.apiBaseUrl}/sessions`;
 
   list(): Observable<DeviceSession[]> {
-    return this.http.get<ListSessionsResponse>(this.base).pipe(map(r => r.sessions));
+    return this.http.get<ListSessionsResponse>(this.base).pipe(map(r => r.sessions ?? []));
   }
 
   revoke(sessionId: string): Observable<void> {

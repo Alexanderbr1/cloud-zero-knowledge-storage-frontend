@@ -82,9 +82,9 @@ export class AppComponent implements OnInit {
       this.restoring.set(false);
       return;
     }
-    this.auth.tryRestoreSession().subscribe(() => {
-      this.restoring.set(false);
-    });
+    this.auth.tryRestoreSession().pipe(
+      finalize(() => this.restoring.set(false)),
+    ).subscribe();
   }
 
   setAuthMode(mode: 'login' | 'register'): void {

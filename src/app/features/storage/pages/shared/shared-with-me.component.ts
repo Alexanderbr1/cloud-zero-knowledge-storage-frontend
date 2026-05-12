@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize, from, switchMap } from 'rxjs';
 
 import { AuthService } from '../../../../core/services/auth.service';
@@ -13,11 +14,13 @@ import { shortMimeType, triggerBrowserDownload } from '../../../../core/utils/br
   imports: [DatePipe],
   templateUrl: './shared-with-me.component.html',
   styleUrl: './shared-with-me.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SharedWithMeComponent implements OnInit {
   private readonly sharingService = inject(SharingService);
   private readonly crypto = inject(CryptoService);
   private readonly auth = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly shares = signal<ShareItem[]>([]);
   readonly isLoading = signal(false);
@@ -35,6 +38,7 @@ export class SharedWithMeComponent implements OnInit {
     this.errorMessage.set('');
     this.sharingService.listSharedWithMe().pipe(
       finalize(() => this.isLoading.set(false)),
+      takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: resp => this.shares.set(resp.items ?? []),
       error: () => this.errorMessage.set('Не удалось загрузить список файлов.'),
@@ -49,6 +53,7 @@ export class SharedWithMeComponent implements OnInit {
     this.sharingService.getSharedFile(item.share_id).pipe(
       switchMap(result => from(this.fetchAndSave(result, item.content_type))),
       finalize(() => this.downloadingId.set(null)),
+      takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: () => this.actionMessage.set(`Файл «${item.file_name}» скачан.`),
       error: (err: unknown) => {

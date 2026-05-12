@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 
 import { DeviceSession } from '../../models/session.model';
@@ -10,9 +11,11 @@ import { SessionsService } from '../../services/sessions.service';
   imports: [],
   templateUrl: './sessions.component.html',
   styleUrl: './sessions.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SessionsComponent implements OnInit {
   private readonly sessionsService = inject(SessionsService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly sessions = signal<DeviceSession[]>([]);
   readonly isLoading = signal(false);
@@ -28,7 +31,7 @@ export class SessionsComponent implements OnInit {
     this.errorMessage.set('');
     this.sessionsService
       .list()
-      .pipe(finalize(() => this.isLoading.set(false)))
+      .pipe(finalize(() => this.isLoading.set(false)), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: sessions => this.sessions.set(sessions),
         error: () => this.errorMessage.set('Не удалось загрузить список сессий.'),
@@ -39,7 +42,7 @@ export class SessionsComponent implements OnInit {
     this.revoking.set(session.id);
     this.sessionsService
       .revoke(session.id)
-      .pipe(finalize(() => this.revoking.set(null)))
+      .pipe(finalize(() => this.revoking.set(null)), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => this.sessions.update(list => list.filter(s => s.id !== session.id)),
         error: () => this.errorMessage.set('Не удалось завершить сессию.'),
@@ -50,7 +53,7 @@ export class SessionsComponent implements OnInit {
     this.revoking.set('others');
     this.sessionsService
       .revokeOthers()
-      .pipe(finalize(() => this.revoking.set(null)))
+      .pipe(finalize(() => this.revoking.set(null)), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => this.sessions.update(list => list.filter(s => s.is_current)),
         error: () => this.errorMessage.set('Не удалось завершить другие сессии.'),
