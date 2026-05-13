@@ -1,0 +1,184 @@
+<div class="page-container">
+
+  <div class="page-header">
+    <div class="page-header__title">
+      <h1 class="page-title">Корзина</h1>
+      @if (!isEmpty && !isLoading()) {
+        <span class="item-count">{{ folders().length + blobs().length }}</span>
+      }
+    </div>
+    @if (!isEmpty && !isLoading()) {
+      <div class="page-header__actions">
+        <button type="button" class="btn btn--ghost btn--sm" (click)="load()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M1.5 7A5.5 5.5 0 1 0 3 3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <path d="M1.5 2v2.5H4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Обновить
+        </button>
+        <button type="button" class="btn btn--danger btn--sm" (click)="emptyTrash()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M3 3.5l.6 8a.5.5 0 0 0 .5.5h5.8a.5.5 0 0 0 .5-.5l.6-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5.5 6v4M8.5 6v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          Очистить корзину
+        </button>
+      </div>
+    }
+  </div>
+
+  @if (actionMessage()) {
+    <div class="alert alert--success" role="status">{{ actionMessage() }}</div>
+  }
+  @if (errorMessage()) {
+    <div class="alert alert--error" role="alert">{{ errorMessage() }}</div>
+  }
+
+  <div class="trash-hint text-sm text-muted">
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+      <circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.2"/>
+      <path d="M6.5 5.5v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+      <circle cx="6.5" cy="3.8" r="0.7" fill="currentColor"/>
+    </svg>
+    Файлы в корзине удаляются автоматически через 30 дней.
+  </div>
+
+  <div class="files-card card">
+    <div class="table-head">
+      <span class="col-name">Имя</span>
+      <span class="col-type">Тип</span>
+      <span class="col-date">Создан</span>
+      <span class="col-actions"></span>
+    </div>
+    <hr class="divider">
+
+    @if (isLoading()) {
+      <ul class="table-list" aria-label="Загрузка…">
+        @for (n of [1,2,3,4]; track n) {
+          <li class="table-row table-row--skeleton">
+            <div class="col-name">
+              <div class="skeleton skeleton--icon"></div>
+              <div class="skeleton skeleton--name"></div>
+            </div>
+            <div class="skeleton skeleton--cell"></div>
+            <div class="skeleton skeleton--cell"></div>
+            <div class="col-actions"></div>
+          </li>
+        }
+      </ul>
+    } @else if (isEmpty) {
+      <div class="table-empty">
+        <div class="empty-icon" aria-hidden="true">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <rect x="8" y="14" width="32" height="28" rx="3" stroke="var(--c-border-strong)" stroke-width="1.6"/>
+            <path d="M5 14h38M19 14v-3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v3" stroke="var(--c-border-strong)" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M19.5 23v10M24 23v10M28.5 23v10" stroke="var(--c-border-strong)" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p class="text-muted">Корзина пуста</p>
+        <span class="text-xs text-muted">Удалённые файлы и папки появятся здесь</span>
+      </div>
+    } @else {
+      <ul class="table-list" role="list">
+
+        @for (item of folders(); track item.folder_id; let i = $index) {
+          <li
+            class="table-row"
+            [class.table-row--removing]="isFading(item.folder_id)"
+            [style.--row-i]="i"
+          >
+            <div class="col-name">
+              <div class="file-icon file-icon--folder">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M1.5 4.5A1.5 1.5 0 0 1 3 3h3.379a1.5 1.5 0 0 1 1.06.44l.622.621A1.5 1.5 0 0 0 9.121 4.5H13A1.5 1.5 0 0 1 14.5 6v6A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V4.5z" stroke="currentColor" stroke-width="1.3"/>
+                </svg>
+              </div>
+              <div class="file-name-wrap">
+                <span class="file-name" [attr.title]="item.name">{{ item.name }}</span>
+              </div>
+            </div>
+            <span class="col-type">
+              <span class="badge badge--muted">Папка</span>
+            </span>
+            <span class="col-date text-secondary text-sm">{{ item.created_at | date: 'dd.MM.yyyy' }}</span>
+            <div class="col-actions">
+              <button
+                type="button"
+                class="btn btn--ghost btn--sm btn--icon"
+                title="Восстановить"
+                [attr.aria-label]="'Восстановить папку ' + item.name"
+                (click)="restoreFolder(item)"
+              >
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                  <path d="M1.5 7.5A6 6 0 1 0 3 3.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  <path d="M1.5 2v3H4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <button
+                type="button"
+                class="btn btn--ghost btn--sm btn--icon btn--icon-danger"
+                title="Удалить безвозвратно"
+                [attr.aria-label]="'Удалить папку ' + item.name"
+                (click)="hardDeleteFolder(item)"
+              >
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                  <path d="M2.5 4h10M6 4V3a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M3.5 4l.5 8.5a.5.5 0 0 0 .5.5h5.5a.5.5 0 0 0 .5-.5L11 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </li>
+        }
+
+        @for (item of blobs(); track item.blob_id; let i = $index) {
+          <li
+            class="table-row"
+            [class.table-row--removing]="isFading(item.blob_id)"
+            [style.--row-i]="folders().length + i"
+          >
+            <div class="col-name">
+              <div class="file-icon">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                  <rect x="2" y="1" width="8.5" height="13" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+                  <path d="M4.5 5h4.5M4.5 7.5h4.5M4.5 10h2.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+                  <path d="M8.5 1v3.5H12" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="file-name-wrap">
+                <span class="file-name" [attr.title]="item.file_name">{{ item.file_name }}</span>
+              </div>
+            </div>
+            <span class="col-type text-secondary text-sm">{{ shortType(item.content_type) }}</span>
+            <span class="col-date text-secondary text-sm">{{ item.created_at | date: 'dd.MM.yyyy' }}</span>
+            <div class="col-actions">
+              <button
+                type="button"
+                class="btn btn--ghost btn--sm btn--icon"
+                title="Восстановить"
+                [attr.aria-label]="'Восстановить файл ' + item.file_name"
+                (click)="restoreBlob(item)"
+              >
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                  <path d="M1.5 7.5A6 6 0 1 0 3 3.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  <path d="M1.5 2v3H4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <button
+                type="button"
+                class="btn btn--ghost btn--sm btn--icon btn--icon-danger"
+                title="Удалить безвозвратно"
+                [attr.aria-label]="'Удалить файл ' + item.file_name"
+                (click)="hardDeleteBlob(item)"
+              >
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                  <path d="M2.5 4h10M6 4V3a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M3.5 4l.5 8.5a.5.5 0 0 0 .5.5h5.5a.5.5 0 0 0 .5-.5L11 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </li>
+        }
+
+      </ul>
+    }
+  </div>
+
+</div>

@@ -5,6 +5,7 @@ import { Observable, from, map, switchMap, throwError } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { FileItem } from '../models/file-item.model';
 import { FolderItem } from '../models/folder.model';
+import { TrashListResponse } from '../models/trash.model';
 import { CryptoService } from '../../../core/services/crypto.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { triggerBrowserDownload } from '../../../core/utils/browser.utils';
@@ -168,6 +169,34 @@ export class FilesService {
 
   search(query: string): Observable<SearchResponse> {
     return this.http.get<SearchResponse>(`${this.baseUrl}/search`, { params: { q: query } });
+  }
+
+  // ─── Trash ────────────────────────────────────────────────────────────────
+
+  private readonly trashUrl = `${environment.apiBaseUrl}/trash`;
+
+  listTrash(): Observable<TrashListResponse> {
+    return this.http.get<TrashListResponse>(this.trashUrl);
+  }
+
+  restoreBlob(blobId: string): Observable<void> {
+    return this.http.post<void>(`${this.trashUrl}/blobs/${encodeURIComponent(blobId)}/restore`, {});
+  }
+
+  hardDeleteBlob(blobId: string): Observable<void> {
+    return this.http.delete<void>(`${this.trashUrl}/blobs/${encodeURIComponent(blobId)}`);
+  }
+
+  restoreFolder(folderId: string): Observable<void> {
+    return this.http.post<void>(`${this.trashUrl}/folders/${encodeURIComponent(folderId)}/restore`, {});
+  }
+
+  hardDeleteFolder(folderId: string): Observable<void> {
+    return this.http.delete<void>(`${this.trashUrl}/folders/${encodeURIComponent(folderId)}`);
+  }
+
+  emptyTrash(): Observable<void> {
+    return this.http.delete<void>(this.trashUrl);
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────────

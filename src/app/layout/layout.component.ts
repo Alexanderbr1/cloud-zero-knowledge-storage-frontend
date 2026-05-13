@@ -21,13 +21,28 @@ export class LayoutComponent {
 
   readonly userEmail = computed(() => this.auth.email() ?? '');
 
-  readonly isMenuOpen = signal(false);
+  readonly isMenuOpen    = signal(false);
+  readonly isUserMenuOpen = signal(false);
 
-  toggleMenu(): void { this.isMenuOpen.update(v => !v); }
-  closeMenu(): void  { this.isMenuOpen.set(false); }
+  toggleMenu(): void     { this.isMenuOpen.update(v => !v); }
+  closeMenu(): void      { this.isMenuOpen.set(false); }
+
+  toggleUserMenu(e: MouseEvent): void {
+    e.stopPropagation();
+    this.isUserMenuOpen.update(v => !v);
+    this.isMenuOpen.set(false);
+  }
+
+  @HostListener('document:click')
+  onDocClick(): void {
+    this.isUserMenuOpen.set(false);
+  }
 
   @HostListener('document:keydown.escape')
-  onEscape(): void { this.closeMenu(); }
+  onEscape(): void {
+    this.closeMenu();
+    this.isUserMenuOpen.set(false);
+  }
 
   logout(): void {
     this.auth.logout();

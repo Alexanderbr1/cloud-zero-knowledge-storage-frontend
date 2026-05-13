@@ -22,6 +22,11 @@ export const routes: Routes = [
           import('./features/storage/pages/shared/shared-with-me.component').then(m => m.SharedWithMeComponent),
       },
       {
+        path: 'trash',
+        loadComponent: () =>
+          import('./features/storage/pages/trash/trash.component').then(m => m.TrashComponent),
+      },
+      {
         path: 'profile',
         loadComponent: () =>
           import('./features/sessions/pages/profile/profile.component').then(m => m.ProfileComponent),
