@@ -91,9 +91,18 @@
 
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
+  .sessions-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 16px;
+
+    .btn { flex: 1; justify-content: center; }
+  }
+
   .session-row {
     grid-template-columns: 36px 1fr;
     grid-template-rows: auto auto;
+    padding: 12px 16px;
   }
 
   .session-icon { width: 36px; height: 36px; }

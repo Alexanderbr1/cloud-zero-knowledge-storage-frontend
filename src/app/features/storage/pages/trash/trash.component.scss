@@ -210,7 +210,11 @@
 
 @media (max-width: 420px) {
   .table-head,
-  .table-row { grid-template-columns: 1fr 76px; }
+  .table-row {
+    grid-template-columns: 1fr 76px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
   .col-type,
   .col-date  { display: none; }
 }

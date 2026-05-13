@@ -112,22 +112,19 @@
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 700px) {
   .table-head,
-  .table-row {
-    grid-template-columns: 1fr 120px 90px 48px;
-  }
-
-  .col-type,
-  .table-head .col-type { display: none; }
+  .table-row { grid-template-columns: 1fr 120px 90px 48px; }
+  .col-type  { display: none; }
 }
 
-@media (max-width: 500px) {
+@media (max-width: 560px) {
   .table-head,
-  .table-row {
-    grid-template-columns: 1fr 48px;
-  }
+  .table-row { grid-template-columns: 1fr 90px 48px; }
+  .col-type  { display: none; }
+}
 
+@media (max-width: 420px) {
+  .table-head,
+  .table-row  { grid-template-columns: 1fr 48px; }
   .col-owner,
-  .col-date,
-  .table-head .col-owner,
-  .table-head .col-date { display: none; }
+  .col-date   { display: none; }
 }

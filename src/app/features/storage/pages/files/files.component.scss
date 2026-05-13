@@ -611,7 +611,7 @@
 }
 
 /* ─── Mobile: page header стекает на маленьких экранах ───────────────────── */
-@media (max-width: 480px) {
+@media (max-width: 540px) {
   .page-header {
     flex-wrap: wrap;
     gap: 10px;
@@ -647,9 +647,16 @@
   .table-head,
   .table-row {
     grid-template-columns: 1fr 112px;
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   .col-type,
   .col-size,
   .col-date { display: none; }
+}
+
+@media (max-width: 320px) {
+  .table-head,
+  .table-row { grid-template-columns: 1fr 80px; }
 }

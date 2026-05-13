@@ -81,3 +81,19 @@
   color: var(--c-text);
   margin-bottom: 12px;
 }
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .user-card {
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    gap: 12px;
+  }
+
+  .user-actions {
+    margin-left: 0;
+    width: 100%;
+
+    .btn { width: 100%; justify-content: center; }
+  }
+}

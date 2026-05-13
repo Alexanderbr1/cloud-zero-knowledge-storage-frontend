@@ -408,6 +408,18 @@ input, textarea { font-family: inherit; }
 /* ─── Responsive page padding ─────────────────────────────────────────────── */
 @media (max-width: 640px) {
   :root { --page-px: 16px; }
+
+  .page-container {
+    padding-top: 20px;
+    padding-bottom: 40px;
+  }
+
+  .page-title { font-size: 19px; }
+  .page-header { margin-bottom: 16px; }
+}
+
+@media (max-width: 360px) {
+  :root { --page-px: 12px; }
 }
 
 /* ─── Touch-friendly targets ──────────────────────────────────────────────── */
