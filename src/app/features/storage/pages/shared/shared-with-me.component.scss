@@ -110,6 +110,13 @@
 }
 
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
+/* desktop with sidebar: viewport 769–939px → content 529–699px */
+@media (min-width: 769px) and (max-width: 939px) {
+  .table-head,
+  .table-row { grid-template-columns: 1fr 120px 90px 48px; }
+  .col-type  { display: none; }
+}
+
 @media (max-width: 700px) {
   .table-head,
   .table-row { grid-template-columns: 1fr 120px 90px 48px; }

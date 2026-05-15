@@ -373,7 +373,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 400;
   padding: 16px;
   animation: fadeIn 0.2s ease both;
 }
@@ -624,13 +624,17 @@
 }
 
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
+/* desktop with sidebar: viewport 769–939px → content 529–699px */
+@media (min-width: 769px) and (max-width: 939px) {
+  .table-head,
+  .table-row { grid-template-columns: 1fr 72px 100px 112px; }
+  .col-type  { display: none; }
+}
+
 @media (max-width: 700px) {
   .table-head,
-  .table-row {
-    grid-template-columns: 1fr 72px 100px 112px;
-  }
-
-  .col-type { display: none; }
+  .table-row { grid-template-columns: 1fr 72px 100px 112px; }
+  .col-type  { display: none; }
 }
 
 @media (max-width: 520px) {
