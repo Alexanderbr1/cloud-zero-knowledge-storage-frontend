@@ -166,25 +166,48 @@
       @if (!hasFolders() && !hasFiles() && !isCreatingFolder()) {
         <div class="table-empty">
           <div class="empty-illustration" aria-hidden="true">
-            <svg width="160" height="128" viewBox="0 0 160 128" fill="none">
-              <!-- background ellipse -->
-              <ellipse cx="80" cy="76" rx="66" ry="48" fill="#EBF2FF"/>
-              <!-- folder tab -->
-              <rect x="14" y="62" width="46" height="16" rx="6" fill="#B3CFFF"/>
-              <!-- folder body -->
-              <rect x="12" y="74" width="130" height="50" rx="8" fill="#DCE9FF" stroke="#B3CFFF" stroke-width="1.5"/>
-              <!-- upload badge -->
-              <circle cx="80" cy="46" r="26" fill="#FFFFFF" stroke="#B3CFFF" stroke-width="1.5"/>
-              <!-- upload arrow -->
-              <path d="M80 58V34M72 42l8-8 8 8" stroke="#005BFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-              <!-- decorative dots -->
-              <circle cx="20" cy="53" r="5" fill="#B3CFFF"/>
-              <circle cx="14" cy="65" r="3" fill="#EBF2FF" stroke="#B3CFFF" stroke-width="1"/>
-              <circle cx="140" cy="56" r="4" fill="#5B9AFF" opacity="0.28"/>
-              <circle cx="146" cy="68" r="2.5" fill="#B3CFFF"/>
-              <!-- sparkle stars -->
-              <path d="M37 28L39.5 32.5L44 34L39.5 35.5L37 40L34.5 35.5L30 34L34.5 32.5Z" fill="#5B9AFF" opacity="0.45"/>
-              <path d="M122 38L124 42L128 43.5L124 45L122 49L120 45L116 43.5L120 42Z" fill="#005BFF" opacity="0.3"/>
+            <!-- unDraw "folder" adapted: #6c63ff→#005BFF, #ff5252→#5B9AFF, grays→design tokens -->
+            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="220" viewBox="0 0 729.47 695.09">
+              <defs>
+                <linearGradient id="fd-g1" x1="611.98" y1="687.2" x2="611.98" y2="258.73" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="gray" stop-opacity="0.25"/><stop offset="0.54" stop-color="gray" stop-opacity="0.12"/><stop offset="1" stop-color="gray" stop-opacity="0.1"/></linearGradient>
+                <linearGradient id="fd-g2" x1="410.91" y1="358.56" x2="452.61" y2="86.08" gradientTransform="matrix(1.01,0.13,-0.13,1.02,62.29,-41.05)" xlink:href="#fd-g1"/>
+                <linearGradient id="fd-g3" x1="597.01" y1="453.03" x2="597.01" y2="138.64" gradientTransform="translate(140.76 -189.73) rotate(20.42)" xlink:href="#fd-g1"/>
+                <linearGradient id="fd-g4" x1="756.62" y1="488.3" x2="772.25" y2="249.01" gradientTransform="matrix(0.26,0.99,-1.02,0.25,910.43,-476.82)" xlink:href="#fd-g1"/>
+                <linearGradient id="fd-g5" x1="310" y1="695.09" x2="310" y2="203.86" xlink:href="#fd-g1"/>
+                <linearGradient id="fd-g6" x1="545.79" y1="695.81" x2="545.79" y2="464.64" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#b3b3b3" stop-opacity="0.25"/><stop offset="0.54" stop-color="#b3b3b3" stop-opacity="0.1"/><stop offset="1" stop-color="#b3b3b3" stop-opacity="0.05"/></linearGradient>
+                <linearGradient id="fd-g7" x1="310.8" y1="580.62" x2="310.8" y2="375.85" xlink:href="#fd-g6"/>
+                <clipPath id="fd-clip"><rect x="400.07" y="483.3" width="291.69" height="194.01" rx="8.85" ry="8.85" fill="#fff" transform="translate(-235.26 -102.45)"/></clipPath>
+              </defs>
+              <polygon points="618.97 687.2 513.53 687.2 513.53 258.73 710.42 258.73 618.97 687.2" fill="url(#fd-g1)"/>
+              <polygon points="613.72 687.2 510.37 687.2 510.37 258.73 703.35 258.73 613.72 687.2" fill="#F3F6FA"/>
+              <rect x="249.88" y="158.45" width="439.19" height="168.85" transform="translate(-283.32 32.9) rotate(-15.62)" fill="url(#fd-g2)"/>
+              <rect x="254.32" y="160.66" width="431.85" height="163.44" transform="translate(-283.15 33.09) rotate(-15.62)" fill="#F3F6FA"/>
+              <rect x="367.9" y="230.63" width="108.65" height="8.29" transform="translate(-282.88 19.88) rotate(-15.62)" fill="#F3F6FA"/>
+              <rect x="376.82" y="262.55" width="108.65" height="8.29" transform="translate(-291.14 23.46) rotate(-15.62)" fill="#fff"/>
+              <rect x="371.14" y="237.71" width="174.6" height="8.29" transform="translate(-283.45 29.89) rotate(-15.62)" fill="#fff"/>
+              <circle cx="329.58" cy="277.88" r="19.34" transform="translate(-297.9 -3.47) rotate(-15.62)" fill="#fff"/>
+              <rect x="376.38" y="210.25" width="441.26" height="171.17" transform="translate(-300.97 124.47) rotate(-20.42)" fill="url(#fd-g3)"/>
+              <rect x="381.03" y="214.81" width="431.85" height="163.44" transform="translate(-301.21 124.5) rotate(-20.42)" fill="#F3F6FA"/>
+              <rect x="494.14" y="288.83" width="108.65" height="8.29" transform="translate(-303.02 107.35) rotate(-20.42)" fill="#F3F6FA"/>
+              <rect x="505.71" y="319.89" width="108.65" height="8.29" transform="translate(-313.13 113.34) rotate(-20.42)" fill="#fff"/>
+              <rect x="497.85" y="292.85" width="174.6" height="8.29" transform="matrix(0.94,-0.35,0.35,0.94,-302.12,120.41)" fill="#fff"/>
+              <circle cx="459.76" cy="343.69" r="19.34" transform="translate(-326.29 79.59) rotate(-20.42)" fill="#fff"/>
+              <rect x="646.89" y="150.88" width="172.17" height="440.14" transform="translate(3.97 925.06) rotate(-79.9)" fill="url(#fd-g4)"/>
+              <rect x="515.81" y="288.22" width="431.85" height="163.44" transform="translate(-159.05 -225.04) rotate(10.1)" fill="#fafafa"/>
+              <rect x="687.63" y="287.92" width="8.29" height="108.65" transform="translate(-1.75 860.83) rotate(-79.9)" fill="#F3F6FA"/>
+              <rect x="681.81" y="320.56" width="8.29" height="108.65" transform="translate(-38.67 882.02) rotate(-79.9)" fill="#fff"/>
+              <rect x="717.18" y="277.05" width="8.29" height="174.6" transform="translate(0.86 908.15) rotate(-79.9)" fill="#fff"/>
+              <circle cx="589.6" cy="340.88" r="19.34" transform="translate(-84.66 759.11) rotate(-79.9)" fill="#fff"/>
+              <polygon points="171.78 253.69 100.61 203.86 2.07 203.86 2.07 253.69 2.07 278.1 2.07 695.09 617.93 695.09 617.93 253.69 171.78 253.69" fill="url(#fd-g5)"/>
+              <polygon points="174.44 258.73 104.36 210.36 7.34 210.36 7.34 258.73 7.34 282.43 7.34 687.2 613.72 687.2 613.72 258.73 174.44 258.73" fill="#fff"/>
+              <path d="M711.54,688.53a7.25,7.25,0,0,1-7.21,7.28H387.26a7.25,7.25,0,0,1-7.21-7.28V471.93a7.25,7.25,0,0,1,7.21-7.28H704.33a7.25,7.25,0,0,1,7.21,7.28" transform="translate(-235.26 -102.45)" fill="url(#fd-g6)"/>
+              <path d="M707.81,685a7,7,0,0,1-7,7H391.05a7,7,0,0,1-7-7V475.62a7,7,0,0,1,7-7H700.77a7,7,0,0,1,7,7" transform="translate(-235.26 -102.45)" fill="#fff"/>
+              <rect x="161.12" y="375.85" width="299.37" height="204.76" rx="8.85" ry="8.85" fill="url(#fd-g7)"/>
+              <rect x="164.8" y="380.84" width="291.69" height="194.01" rx="8.85" ry="8.85" fill="#fff"/>
+              <g clip-path="url(#fd-clip)">
+                <path d="M383.84,675.53l81.44-93.31a16.21,16.21,0,0,1,22.94-1.5L511,600.84a16.21,16.21,0,0,0,21.16.25l69.7-58.58A16.21,16.21,0,0,1,624.3,544l85.53,94.14a16.21,16.21,0,0,1,4.15,9.47l3.3,37.13a16.21,16.21,0,0,1-16.15,17.65H396.06a16.21,16.21,0,0,1-16.2-15.72h0A16.21,16.21,0,0,1,383.84,675.53Z" transform="translate(-235.26 -102.45)" fill="#005BFF"/>
+              </g>
+              <circle cx="199.93" cy="411.95" r="18.06" fill="#5B9AFF"/>
             </svg>
           </div>
           <p class="empty-title">Нет файлов</p>
@@ -193,25 +216,26 @@
       } @else if (searchQuery() && !isSearching() && !hasResults() && !isCreatingFolder()) {
         <div class="table-empty">
           <div class="empty-illustration" aria-hidden="true">
-            <svg width="140" height="112" viewBox="0 0 140 112" fill="none">
-              <!-- background ellipse -->
-              <ellipse cx="70" cy="62" rx="56" ry="44" fill="#EBF2FF"/>
-              <!-- magnifying glass circle -->
-              <circle cx="57" cy="48" r="28" fill="#FFFFFF" stroke="#B3CFFF" stroke-width="2"/>
-              <!-- handle -->
-              <path d="M79 68L100 90" stroke="#B3CFFF" stroke-width="9" stroke-linecap="round"/>
-              <!-- dashed lines inside (empty results) -->
-              <path d="M43 42H71" stroke="#B3CFFF" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 3"/>
-              <path d="M43 50H65" stroke="#B3CFFF" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 3"/>
-              <path d="M43 58H57" stroke="#B3CFFF" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 3"/>
-              <!-- X mark in glass -->
-              <circle cx="57" cy="50" r="11" fill="#EBF2FF"/>
-              <path d="M52 45L62 55M62 45L52 55" stroke="#B3CFFF" stroke-width="1.8" stroke-linecap="round"/>
-              <!-- decorative dots -->
-              <circle cx="17" cy="54" r="4" fill="#B3CFFF"/>
-              <circle cx="120" cy="46" r="3" fill="#5B9AFF" opacity="0.3"/>
-              <!-- sparkle -->
-              <path d="M24 34L26.5 39L29 34L26.5 29Z" fill="#5B9AFF" opacity="0.45"/>
+            <svg xmlns="http://www.w3.org/2000/svg" width="200" viewBox="0 0 420 340">
+              <ellipse cx="150" cy="322" rx="88" ry="13" fill="#005BFF" opacity="0.07"/>
+              <path d="M55,278 Q8,256 18,188 Q28,120 88,98 Q148,76 212,108 Q282,142 292,202 Q302,262 242,292 Q182,322 55,278Z" fill="#EBF2FF"/>
+              <rect x="238" y="38" width="88" height="108" rx="8" fill="#F3F6FA" stroke="#E1E5ED" stroke-width="2" transform="rotate(14 282 92)"/>
+              <rect x="255" y="52" width="52" height="7" rx="3.5" fill="#E1E5ED" transform="rotate(14 282 92)"/>
+              <rect x="255" y="65" width="38" height="7" rx="3.5" fill="#E1E5ED" transform="rotate(14 282 92)"/>
+              <rect x="18" y="76" width="80" height="96" rx="8" fill="#F3F6FA" stroke="#E1E5ED" stroke-width="2" transform="rotate(-13 58 124)"/>
+              <rect x="30" y="91" width="46" height="7" rx="3.5" fill="#E1E5ED" transform="rotate(-13 58 124)"/>
+              <rect x="30" y="104" width="34" height="7" rx="3.5" fill="#E1E5ED" transform="rotate(-13 58 124)"/>
+              <rect x="170" y="202" width="86" height="22" rx="11" fill="#B3CFFF" transform="rotate(45 213 213)"/>
+              <circle cx="152" cy="153" r="96" fill="#DCE9FF"/>
+              <circle cx="148" cy="148" r="96" fill="#FFFFFF" stroke="#B3CFFF" stroke-width="4"/>
+              <rect x="100" y="118" width="96" height="10" rx="5" fill="#F3F6FA"/>
+              <rect x="100" y="136" width="72" height="10" rx="5" fill="#F3F6FA"/>
+              <rect x="100" y="154" width="52" height="10" rx="5" fill="#F3F6FA"/>
+              <circle cx="148" cy="148" r="36" fill="#EBF2FF"/>
+              <path d="M134 134L162 162M162 134L134 162" stroke="#B3CFFF" stroke-width="5" stroke-linecap="round"/>
+              <circle cx="318" cy="26" r="10" fill="#EBF2FF" stroke="#B3CFFF" stroke-width="2"/>
+              <circle cx="28" cy="44" r="8" fill="#B3CFFF" opacity="0.5"/>
+              <path d="M330 158L333 167 336 158 333 149Z" fill="#5B9AFF" opacity="0.4"/>
             </svg>
           </div>
           <p class="empty-title">Ничего не найдено</p>
