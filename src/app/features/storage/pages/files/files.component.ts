@@ -14,6 +14,7 @@ import { FileItem } from '../../models/file-item.model';
 import { BreadcrumbItem, FolderItem } from '../../models/folder.model';
 import { FilesService } from '../../services/files.service';
 import { shortMimeType } from '../../../../core/utils/browser.utils';
+import { InputModalComponent } from '../../../../shared/components/input-modal/input-modal.component';
 
 interface SearchResults {
   blobs: FileItem[];
@@ -23,7 +24,7 @@ interface SearchResults {
 @Component({
   selector: 'app-files',
   standalone: true,
-  imports: [DatePipe],
+  imports: [DatePipe, InputModalComponent],
   templateUrl: './files.component.html',
   styleUrl: './files.component.scss',
 })
@@ -36,7 +37,6 @@ export class FilesComponent implements OnInit {
 
   @ViewChild('fileInput')       private fileInputRef?: ElementRef<HTMLInputElement>;
   @ViewChild('shareEmailInput') private shareEmailInputRef?: ElementRef<HTMLInputElement>;
-  @ViewChild('newFolderInput')  private newFolderInputRef?: ElementRef<HTMLInputElement>;
 
   // ─── File state ───────────────────────────────────────────────────────────
 
@@ -252,7 +252,10 @@ export class FilesComponent implements OnInit {
     this.isCreatingFolder.set(true);
     this.newFolderName.set('');
     this.creatingFolderError.set('');
-    setTimeout(() => this.newFolderInputRef?.nativeElement.focus());
+    setTimeout(() => {
+      const input = document.querySelector<HTMLInputElement>('.modal-input');
+      input?.focus();
+    });
   }
 
   cancelCreateFolder(): void {
@@ -289,7 +292,7 @@ export class FilesComponent implements OnInit {
     this.renameError.set('');
     this.isRenaming.set(false);
     setTimeout(() => {
-      const input = document.querySelector<HTMLInputElement>('.rename-modal-input');
+      const input = document.querySelector<HTMLInputElement>('.modal-input');
       if (input) { input.focus(); input.select(); }
     });
   }
@@ -517,6 +520,7 @@ export class FilesComponent implements OnInit {
           this.loadContent();
         },
         error: (err: unknown) => {
+          this.selectedFile.set(null);
           if (this.isMasterKeyMissing(err)) {
             this.auth.clearAccess();
             this.toast.error('Сессия истекла — войдите снова.');
