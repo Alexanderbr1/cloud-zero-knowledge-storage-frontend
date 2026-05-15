@@ -135,15 +135,12 @@ export class FilesComponent implements OnInit {
   readonly newFolderName       = signal('');
   readonly creatingFolderError = signal('');
 
-  // ─── Rename folder ────────────────────────────────────────────────────────
+  // ─── Rename modal ─────────────────────────────────────────────────────────
 
-  readonly renamingFolderId = signal<string | null>(null);
-  readonly renameFolderName = signal('');
-
-  // ─── Rename file ──────────────────────────────────────────────────────────
-
-  readonly renamingFileId = signal<string | null>(null);
-  readonly renameFileName  = signal('');
+  readonly renameTarget     = signal<{ type: 'file' | 'folder'; id: string; name: string } | null>(null);
+  readonly renameInputValue = signal('');
+  readonly renameError      = signal('');
+  readonly isRenaming       = signal(false);
 
   // ─── Drag-and-drop ────────────────────────────────────────────────────────
 
@@ -217,10 +214,9 @@ export class FilesComponent implements OnInit {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
-    if (this.accessFile())         { this.closeAccessDialog(); return; }
-    if (this.renamingFileId())     { this.cancelRenameFile(); return; }
-    if (this.renamingFolderId())   { this.cancelRenameFolder(); return; }
-    if (this.isCreatingFolder())   { this.cancelCreateFolder(); }
+    if (this.accessFile())        { this.closeAccessDialog(); return; }
+    if (this.renameTarget())      { this.closeRenameModal(); return; }
+    if (this.isCreatingFolder())  { this.cancelCreateFolder(); }
   }
 
   // ─── Content loading ──────────────────────────────────────────────────────
@@ -233,7 +229,6 @@ export class FilesComponent implements OnInit {
   // ─── Folder navigation ────────────────────────────────────────────────────
 
   navigateIntoFolder(folder: FolderItem): void {
-    if (this.renamingFolderId() === folder.folder_id) return;
     this.clearSearch();
     this.currentFolderId.set(folder.folder_id);
     this.breadcrumbs.update(crumbs => [...crumbs, { folder_id: folder.folder_id, name: folder.name }]);
@@ -254,8 +249,6 @@ export class FilesComponent implements OnInit {
   // ─── Create folder ────────────────────────────────────────────────────────
 
   openCreateFolder(): void {
-    this.cancelRenameFolder();
-    this.cancelRenameFile();
     this.isCreatingFolder.set(true);
     this.newFolderName.set('');
     this.creatingFolderError.set('');
@@ -287,92 +280,72 @@ export class FilesComponent implements OnInit {
     });
   }
 
-  // ─── Rename folder ────────────────────────────────────────────────────────
+  // ─── Rename modal ─────────────────────────────────────────────────────────
 
-  startRenameFolder(folder: FolderItem, event: Event): void {
+  openRenameModal(target: { type: 'file' | 'folder'; id: string; name: string }, event: Event): void {
     event.stopPropagation();
-    this.cancelCreateFolder();
-    this.cancelRenameFile();
-    this.renamingFolderId.set(folder.folder_id);
-    this.renameFolderName.set(folder.name);
+    this.renameTarget.set(target);
+    this.renameInputValue.set(target.name);
+    this.renameError.set('');
+    this.isRenaming.set(false);
     setTimeout(() => {
-      const input = document.querySelector<HTMLInputElement>('.folder-rename-input');
+      const input = document.querySelector<HTMLInputElement>('.rename-modal-input');
       if (input) { input.focus(); input.select(); }
     });
   }
 
-  cancelRenameFolder(): void {
-    this.renamingFolderId.set(null);
-    this.renameFolderName.set('');
+  closeRenameModal(): void {
+    this.renameTarget.set(null);
+    this.renameInputValue.set('');
+    this.renameError.set('');
+    this.isRenaming.set(false);
   }
 
-  confirmRenameFolder(folder: FolderItem): void {
-    // Guard against the double-call from (keydown.enter) followed by (blur):
-    // clearing renamingFolderId before the API call ensures the blur event that
-    // fires after Enter finds nothing to do.
-    if (this.renamingFolderId() !== folder.folder_id) return;
-    const name = this.renameFolderName().trim();
-    if (!name || name === folder.name) { this.cancelRenameFolder(); return; }
+  confirmRename(): void {
+    const target = this.renameTarget();
+    if (!target) return;
+    const name = this.renameInputValue().trim();
+    if (!name || name === target.name) { this.closeRenameModal(); return; }
 
-    this.cancelRenameFolder();
+    this.isRenaming.set(true);
+    this.renameError.set('');
 
-    this.filesService.renameFolder(folder.folder_id, name).pipe(
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: updated => {
-        this.folders.update(list =>
-          list.map(f => f.folder_id === updated.folder_id ? updated : f)
-              .sort((a, b) => a.name.localeCompare(b.name)),
-        );
-      },
-      error: (err: HttpErrorResponse) => {
-        this.toast.error(
-          err.status === 409 ? 'Папка с таким именем уже существует.' : 'Не удалось переименовать папку.',
-        );
-      },
-    });
-  }
-
-  // ─── Rename file ──────────────────────────────────────────────────────────
-
-  startRenameFile(file: FileItem, event: Event): void {
-    event.stopPropagation();
-    this.cancelCreateFolder();
-    this.cancelRenameFolder();
-    this.renamingFileId.set(file.blob_id);
-    this.renameFileName.set(file.file_name);
-    setTimeout(() => {
-      const input = document.querySelector<HTMLInputElement>('.file-rename-input');
-      if (input) { input.focus(); input.select(); }
-    });
-  }
-
-  cancelRenameFile(): void {
-    this.renamingFileId.set(null);
-    this.renameFileName.set('');
-  }
-
-  confirmRenameFile(file: FileItem): void {
-    if (this.renamingFileId() !== file.blob_id) return;
-    const name = this.renameFileName().trim();
-    if (!name || name === file.file_name) { this.cancelRenameFile(); return; }
-
-    this.cancelRenameFile();
-
-    this.filesService.renameFile(file.blob_id, name).pipe(
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: () => {
-        this.files.update(list =>
-          list.map(f => f.blob_id === file.blob_id ? { ...f, file_name: name } : f),
-        );
-      },
-      error: (err: HttpErrorResponse) => {
-        this.toast.error(
-          err.status === 404 ? 'Файл не найден.' : `Не удалось переименовать «${file.file_name}».`,
-        );
-      },
-    });
+    if (target.type === 'folder') {
+      this.filesService.renameFolder(target.id, name).pipe(
+        finalize(() => this.isRenaming.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      ).subscribe({
+        next: updated => {
+          this.folders.update(list =>
+            list.map(f => f.folder_id === target.id ? updated : f)
+                .sort((a, b) => a.name.localeCompare(b.name)),
+          );
+          this.closeRenameModal();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.renameError.set(
+            err.status === 409 ? 'Папка с таким именем уже существует.' : 'Не удалось переименовать папку.',
+          );
+        },
+      });
+    } else {
+      this.filesService.renameFile(target.id, name).pipe(
+        finalize(() => this.isRenaming.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      ).subscribe({
+        next: () => {
+          this.files.update(list =>
+            list.map(f => f.blob_id === target.id ? { ...f, file_name: name } : f),
+          );
+          this.closeRenameModal();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.renameError.set(
+            err.status === 404 ? 'Файл не найден.' : 'Не удалось переименовать файл.',
+          );
+        },
+      });
+    }
   }
 
   // ─── Delete folder ────────────────────────────────────────────────────────

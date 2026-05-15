@@ -113,7 +113,10 @@ export class FilesService {
               presign.content_type || contentType,
               encryptedBuffer,
               pct => onProgress?.('uploading', pct),
-            ).pipe(map(() => presign));
+            ).pipe(
+              switchMap(() => this.confirmUpload(presign.blob_id)),
+              map(() => presign),
+            );
           }),
         );
       }),
@@ -131,6 +134,10 @@ export class FilesService {
 
   deleteFile(blobId: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/blobs/${encodeURIComponent(blobId)}`);
+  }
+
+  confirmUpload(blobId: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/blobs/${encodeURIComponent(blobId)}/confirm-upload`, {});
   }
 
   // ─── Folders ──────────────────────────────────────────────────────────────
