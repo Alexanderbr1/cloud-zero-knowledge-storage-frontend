@@ -1,8 +1,10 @@
-:host { display: block; }
+:host { display: flex; flex-direction: column; flex: 1; }
+
+.page-container { flex: 1; display: flex; flex-direction: column; }
 
 .alert { margin-bottom: 16px; }
 
-.files-card { overflow: hidden; }
+.files-card { overflow: hidden; flex: 1; }
 
 /* ─── Table structure ─────────────────────────────────────────────────────── */
 .table-head,

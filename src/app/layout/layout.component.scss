@@ -345,4 +345,54 @@
   flex: 1;
   background: var(--c-bg);
   outline: none;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Storage usage widget ────────────────────────────────────────────────── */
+.sidebar__storage {
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--c-border);
+  flex-shrink: 0;
+}
+
+.storage-bar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.storage-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.storage-pct {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text-muted);
+}
+
+.storage-label-sub {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+.storage-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--c-surface-hover);
+  overflow: hidden;
+}
+
+.storage-bar__fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--c-primary);
+  transition: width 0.4s ease;
+
+  &--warn { background: #f59e0b; }
 }

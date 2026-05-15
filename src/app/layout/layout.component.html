@@ -45,6 +45,29 @@
 
     <div class="sidebar__spacer"></div>
 
+    <!-- Storage usage -->
+    @if (storageUsage()) {
+      <div class="sidebar__storage">
+        <div class="storage-bar__header">
+          <span class="storage-label">{{ formatBytes(storageUsage()!.used_bytes) }}</span>
+          @if (storageUsage()!.quota_bytes > 0) {
+            <span class="storage-pct">{{ storagePct() | number:'1.0-0' }}%</span>
+          }
+        </div>
+        <div class="storage-bar" role="progressbar"
+             [attr.aria-valuenow]="storagePct() | number:'1.0-0'"
+             aria-valuemin="0" aria-valuemax="100">
+          <div class="storage-bar__fill"
+               [class.storage-bar__fill--warn]="storagePct() >= 80"
+               [style.width.%]="storagePct()">
+          </div>
+        </div>
+        @if (storageUsage()!.quota_bytes > 0) {
+          <p class="storage-label-sub">из {{ formatBytes(storageUsage()!.quota_bytes) }}</p>
+        }
+      </div>
+    }
+
     <!-- User -->
     <div class="sidebar__user">
       @if (isUserMenuOpen()) {
