@@ -172,6 +172,31 @@
 /* ─── Files card ──────────────────────────────────────────────────────────── */
 .files-card { overflow: hidden; flex: 1; }
 
+/* ─── Skeleton rows ───────────────────────────────────────────────────────── */
+.table-row--skeleton {
+  animation: none !important;
+  pointer-events: none;
+}
+
+.skeleton--icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  flex-shrink: 0;
+}
+
+.skeleton--name {
+  height: 13px;
+  width: 55%;
+  border-radius: var(--r-sm);
+}
+
+.skeleton--cell {
+  height: 13px;
+  width: 70%;
+  border-radius: var(--r-sm);
+}
+
 /* ─── Table structure ─────────────────────────────────────────────────────── */
 .table-head,
 .table-row {

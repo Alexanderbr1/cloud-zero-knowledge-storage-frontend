@@ -22,9 +22,20 @@
     <hr class="divider">
 
     @if (isLoading()) {
-      <div class="table-empty">
-        <span class="text-muted text-sm">Загрузка…</span>
-      </div>
+      <ul class="table-list" aria-label="Загрузка…">
+        @for (n of [1,2,3,4,5]; track n) {
+          <li class="table-row table-row--skeleton">
+            <div class="col-name">
+              <div class="skeleton skeleton--icon"></div>
+              <div class="skeleton skeleton--name"></div>
+            </div>
+            <div class="skeleton skeleton--cell"></div>
+            <div class="skeleton skeleton--cell"></div>
+            <div class="skeleton skeleton--cell"></div>
+            <div class="col-actions"></div>
+          </li>
+        }
+      </ul>
     } @else if (shares().length === 0) {
       <div class="table-empty">
         <div class="empty-illustration" aria-hidden="true">
