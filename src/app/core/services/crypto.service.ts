@@ -186,7 +186,7 @@ export class CryptoService {
   }
 
   /** Wraps raw PKCS8 bytes using a two-level scheme: AES-GCM(aesKwk) + AES-KW(masterKey). */
-  async wrapECPrivateKey(pkcs8: Uint8Array, masterKey: CryptoKey): Promise<string> {
+  async wrapECPrivateKey(pkcs8: Uint8Array<ArrayBuffer>, masterKey: CryptoKey): Promise<string> {
     const subtle = this.requireSubtle();
 
     // Intermediate AES-256 key (KWK) — encrypts the PKCS8 blob via AES-GCM.
