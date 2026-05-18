@@ -35,7 +35,7 @@
       <button
         type="submit"
         class="btn btn--primary btn--lg auth-submit"
-        [disabled]="isSubmitting() || form.invalid"
+        [disabled]="isSubmitting()"
       >
         {{ isSubmitting() ? 'Разблокировка…' : 'Разблокировать' }}
       </button>

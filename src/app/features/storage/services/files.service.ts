@@ -131,6 +131,15 @@ export class FilesService {
       .pipe(switchMap(resp => from(this.fetchAndDecrypt(resp, fileName))));
   }
 
+  downloadFileToBuffer(blobId: string): Observable<ArrayBuffer> {
+    return this.http
+      .post<PresignGetResponse>(
+        `${this.baseUrl}/blobs/${encodeURIComponent(blobId)}/presign-get`,
+        {},
+      )
+      .pipe(switchMap(resp => from(this.fetchAndDecryptToBuffer(resp))));
+  }
+
   deleteFile(blobId: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/blobs/${encodeURIComponent(blobId)}`);
   }
@@ -266,6 +275,16 @@ export class FilesService {
       reader.onerror = () => reject(new Error('File read failed'));
       reader.readAsArrayBuffer(file);
     });
+  }
+
+  private async fetchAndDecryptToBuffer(resp: PresignGetResponse): Promise<ArrayBuffer> {
+    const masterKey = this.auth.getMasterKey();
+    if (!masterKey) throw new Error('Master key not available. Please log in again.');
+    const fetchResp = await fetch(resp.download_url);
+    if (!fetchResp.ok) throw new Error(`Download failed with status ${fetchResp.status}`);
+    const encrypted = await fetchResp.arrayBuffer();
+    const fileKey = await this.crypto.unwrapFileKey(resp.encrypted_file_key, masterKey);
+    return this.crypto.decryptFile(encrypted, fileKey, resp.file_iv);
   }
 
   private async fetchAndDecrypt(resp: PresignGetResponse, fileName: string): Promise<void> {

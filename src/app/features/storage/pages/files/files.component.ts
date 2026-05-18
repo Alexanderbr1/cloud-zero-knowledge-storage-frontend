@@ -5,7 +5,7 @@ import {
   ViewChild, computed, inject, signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, catchError, debounceTime, distinctUntilChanged, finalize, forkJoin, of, switchMap } from 'rxjs';
+import { Subject, catchError, debounceTime, distinctUntilChanged, finalize, forkJoin, from, of, switchMap } from 'rxjs';
 
 import { AuthService } from '../../../../core/services/auth.service';
 import { ShareItem, SharingService } from '../../../../core/services/sharing.service';
@@ -148,6 +148,10 @@ export class FilesComponent implements OnInit {
 
   readonly draggingId       = signal<string | null>(null);
   readonly dragOverFolderId = signal<string | null>(null);
+
+  // ─── Folder download ──────────────────────────────────────────────────────
+
+  readonly downloadingFolderId = signal<string | null>(null);
 
   // ─── Sharing dialog ───────────────────────────────────────────────────────
 
@@ -559,10 +563,60 @@ export class FilesComponent implements OnInit {
       next: () => {
         this.toast.success(`Файл «${file.file_name}» удалён.`);
         this.loadContent();
-        this.usageSvc.refresh();
       },
       error: () => this.toast.error(`Не удалось удалить «${file.file_name}».`),
     });
+  }
+
+  // ─── Folder download ──────────────────────────────────────────────────────
+
+  downloadFolder(folder: FolderItem, event: Event): void {
+    event.stopPropagation();
+    if (this.downloadingFolderId()) return;
+    this.downloadingFolderId.set(folder.folder_id);
+
+    this.filesService.listFilesInFolder(folder.folder_id).pipe(
+      switchMap(files => {
+        if (!files.length) {
+          this.toast.error(`Папка «${folder.name}» пуста.`);
+          return of(null);
+        }
+        return from(this.buildZip(files, folder.name));
+      }),
+      finalize(() => this.downloadingFolderId.set(null)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      error: (err: unknown) => {
+        if (err instanceof Error && err.message.startsWith('Master key')) {
+          this.auth.clearAccess();
+          this.toast.error('Сессия истекла — войдите снова.');
+          return;
+        }
+        this.toast.error(`Не удалось скачать папку «${folder.name}».`);
+      },
+    });
+  }
+
+  private async buildZip(files: FileItem[], folderName: string): Promise<void> {
+    const { default: JSZip } = await import('jszip');
+    const zip = new JSZip();
+
+    await Promise.all(files.map(async file => {
+      const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+        this.filesService.downloadFileToBuffer(file.blob_id)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({ next: resolve, error: reject });
+      });
+      zip.file(file.file_name, buffer);
+    }));
+
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${folderName}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // ─── Sharing dialog ───────────────────────────────────────────────────────

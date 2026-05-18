@@ -1,5 +1,5 @@
-import { Component, input, output } from '@angular/core';
-import { FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { Component, computed, input, output } from '@angular/core';
+import { AbstractControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-auth-panel',
@@ -17,11 +17,15 @@ export class AuthPanelComponent {
   modeChange = output<'login' | 'register'>();
   submitted = output<void>();
 
+  readonly emailControl = computed<AbstractControl>(() => this.credentialsForm().controls['email']);
+  readonly passwordControl = computed<AbstractControl>(() => this.credentialsForm().controls['password']);
+
   selectMode(next: 'login' | 'register'): void {
     this.modeChange.emit(next);
   }
 
   onSubmit(): void {
+    this.credentialsForm().markAllAsTouched();
     this.submitted.emit();
   }
 }

@@ -45,12 +45,18 @@
         <input
           id="auth-email"
           class="input"
+          [class.input--error]="emailControl().invalid && emailControl().touched"
           type="email"
           autocomplete="username"
           formControlName="email"
           placeholder="you@example.com"
           enterkeyhint="next"
         />
+        @if (emailControl().touched && emailControl().hasError('required')) {
+          <span class="field-error">Введите email</span>
+        } @else if (emailControl().touched && emailControl().hasError('email')) {
+          <span class="field-error">Некорректный email</span>
+        }
       </div>
 
       <div class="auth-field">
@@ -58,12 +64,20 @@
         <input
           id="auth-password"
           class="input"
+          [class.input--error]="passwordControl().invalid && passwordControl().touched"
           type="password"
           [attr.autocomplete]="mode() === 'register' ? 'new-password' : 'current-password'"
           formControlName="password"
           [placeholder]="mode() === 'register' ? 'Минимум 8 символов' : 'Ваш пароль'"
           enterkeyhint="go"
         />
+        @if (passwordControl().touched && passwordControl().hasError('required')) {
+          <span class="field-error">Введите пароль</span>
+        } @else if (passwordControl().touched && passwordControl().hasError('minlength')) {
+          <span class="field-error">Минимум 8 символов</span>
+        } @else if (passwordControl().touched && passwordControl().hasError('pattern')) {
+          <span class="field-error">Пароль должен содержать буквы и цифры</span>
+        }
       </div>
 
       @if (errorText()) {

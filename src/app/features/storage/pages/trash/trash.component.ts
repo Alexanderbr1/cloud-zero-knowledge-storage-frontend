@@ -11,6 +11,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 
 import { shortMimeType } from '../../../../core/utils/browser.utils';
+import { StorageUsageService } from '../../../../core/services/storage-usage.service';
 import { FilesService } from '../../services/files.service';
 import { TrashFileItem, TrashFolderItem } from '../../models/trash.model';
 
@@ -24,6 +25,7 @@ import { TrashFileItem, TrashFolderItem } from '../../models/trash.model';
 })
 export class TrashComponent implements OnInit {
   private readonly filesService = inject(FilesService);
+  private readonly usageSvc = inject(StorageUsageService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly blobs = signal<TrashFileItem[]>([]);
@@ -87,6 +89,7 @@ export class TrashComponent implements OnInit {
         this.blobs.update(list => list.filter(b => b.blob_id !== item.blob_id));
         this.actionMessage.set(`«${item.file_name}» удалён безвозвратно.`);
         this.errorMessage.set('');
+        this.usageSvc.refresh();
       }),
       error: () => this.errorMessage.set(`Не удалось удалить «${item.file_name}».`),
     });
@@ -113,6 +116,7 @@ export class TrashComponent implements OnInit {
         this.folders.update(list => list.filter(f => f.folder_id !== item.folder_id));
         this.actionMessage.set(`«${item.name}» удалена безвозвратно.`);
         this.errorMessage.set('');
+        this.usageSvc.refresh();
       }),
       error: () => this.errorMessage.set(`Не удалось удалить «${item.name}».`),
     });
@@ -128,6 +132,7 @@ export class TrashComponent implements OnInit {
         this.folders.set([]);
         this.actionMessage.set('Корзина очищена.');
         this.errorMessage.set('');
+        this.usageSvc.refresh();
       },
       error: () => this.errorMessage.set('Не удалось очистить корзину.'),
     });

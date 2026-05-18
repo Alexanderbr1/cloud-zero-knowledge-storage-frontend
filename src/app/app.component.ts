@@ -71,6 +71,7 @@ export class AppComponent implements OnInit {
   readonly errorMessage = signal('');
 
   private readonly registerPasswordMinLen = Validators.minLength(8);
+  private readonly registerPasswordPattern = Validators.pattern(/^(?=.*[A-Za-z])(?=.*\d).+$/);
 
   loginForm = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
@@ -92,9 +93,9 @@ export class AppComponent implements OnInit {
     this.errorMessage.set('');
     const pass = this.loginForm.controls.password;
     if (mode === 'register') {
-      pass.addValidators(this.registerPasswordMinLen);
+      pass.addValidators([this.registerPasswordMinLen, this.registerPasswordPattern]);
     } else {
-      pass.removeValidators(this.registerPasswordMinLen);
+      pass.removeValidators([this.registerPasswordMinLen, this.registerPasswordPattern]);
     }
     pass.updateValueAndValidity();
   }
