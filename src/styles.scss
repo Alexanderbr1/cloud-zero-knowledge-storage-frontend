@@ -341,8 +341,6 @@ input, textarea { font-family: inherit; }
 
 /* ─── Page layout helpers ─────────────────────────────────────────────────── */
 .page-container {
-  max-width: var(--page-max);
-  margin: 0 auto;
   padding: 32px var(--page-px) 56px;
   animation: fadeIn 0.22s ease both;
 }

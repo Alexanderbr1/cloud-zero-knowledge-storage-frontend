@@ -100,18 +100,17 @@ export class FilesService {
           content_type: contentType,
           encrypted_file_key: wrappedKeyB64,
           file_iv: ivB64,
-          file_size: file.size,
+          file_size: encryptedBuffer.byteLength,
           ...(folderId ? { folder_id: folderId } : {}),
         };
 
         return this.http.post<PresignPutResponse>(`${this.baseUrl}/presign`, payload).pipe(
           switchMap(presign => {
             onProgress?.('uploading', 0);
-            return this.xhrUpload(
+            return this.xhrUploadPut(
               presign.upload_url,
-              presign.http_method || 'PUT',
-              presign.content_type || contentType,
               encryptedBuffer,
+              presign.content_type,
               pct => onProgress?.('uploading', pct),
             ).pipe(
               switchMap(() => this.confirmUpload(presign.blob_id)),
@@ -208,16 +207,15 @@ export class FilesService {
 
   // ─── Private helpers ──────────────────────────────────────────────────────
 
-  private xhrUpload(
+  private xhrUploadPut(
     url: string,
-    method: string,
-    contentType: string,
     body: ArrayBuffer,
+    contentType: string,
     onProgress?: (pct: number) => void,
   ): Observable<void> {
     return new Observable<void>(observer => {
       const xhr = new XMLHttpRequest();
-      xhr.open(method, url);
+      xhr.open('PUT', url);
       xhr.setRequestHeader('Content-Type', contentType);
 
       xhr.upload.addEventListener('progress', event => {

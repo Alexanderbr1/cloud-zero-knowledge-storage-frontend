@@ -237,16 +237,16 @@ export class CryptoService {
 
   /**
    * Derives a KEK from an ECDH shared secret using HKDF-SHA256.
-   * The derived key is AES-KW 256-bit, used to wrap/unwrap a file key.
+   * salt must be the raw SPKI bytes of the ephemeral public key — unique per share.
    */
-  private async deriveShareKEK(ecdhSharedSecret: ArrayBuffer): Promise<CryptoKey> {
+  private async deriveShareKEK(ecdhSharedSecret: ArrayBuffer, salt: ArrayBuffer): Promise<CryptoKey> {
     const subtle = this.requireSubtle();
     const keyMaterial = await subtle.importKey('raw', ecdhSharedSecret, { name: 'HKDF' }, false, ['deriveKey']);
     return subtle.deriveKey(
       {
         name: 'HKDF',
         hash: 'SHA-256',
-        salt: new Uint8Array(32),
+        salt,
         info: new TextEncoder().encode('cloud-file-share'),
       },
       keyMaterial,
@@ -284,9 +284,9 @@ export class CryptoService {
       256,
     );
 
-    const kek = await this.deriveShareKEK(sharedSecret);
-    const wrappedFileKey = await subtle.wrapKey('raw', fileKey, kek, 'AES-KW');
     const ephemeralPub = await subtle.exportKey('spki', ephemeral.publicKey);
+    const kek = await this.deriveShareKEK(sharedSecret, ephemeralPub);
+    const wrappedFileKey = await subtle.wrapKey('raw', fileKey, kek, 'AES-KW');
 
     return {
       ephemeralPubB64: this.toBase64(ephemeralPub),
@@ -305,8 +305,9 @@ export class CryptoService {
   ): Promise<CryptoKey> {
     const subtle = this.requireSubtle();
 
+    const ephemeralPubBytes = this.fromBase64(ephemeralPubB64);
     const ephemeralPub = await subtle.importKey(
-      'spki', this.fromBase64(ephemeralPubB64),
+      'spki', ephemeralPubBytes,
       { name: 'ECDH', namedCurve: 'P-256' }, false, [],
     );
 
@@ -316,7 +317,7 @@ export class CryptoService {
       256,
     );
 
-    const kek = await this.deriveShareKEK(sharedSecret);
+    const kek = await this.deriveShareKEK(sharedSecret, ephemeralPubBytes);
     return subtle.unwrapKey(
       'raw', this.fromBase64(wrappedFileKeyB64), kek, 'AES-KW',
       { name: 'AES-GCM', length: 256 }, false, ['decrypt'],
