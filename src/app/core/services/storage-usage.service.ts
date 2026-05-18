@@ -1,6 +1,5 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 
@@ -14,7 +13,20 @@ export class StorageUsageService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/storage`;
 
-  getUsage(): Observable<StorageUsage> {
-    return this.http.get<StorageUsage>(`${this.base}/usage`);
+  private readonly _usage = signal<StorageUsage | null>(null);
+
+  readonly usage = this._usage.asReadonly();
+
+  readonly pct = computed(() => {
+    const u = this._usage();
+    if (!u || u.quota_bytes <= 0) return 0;
+    return Math.min(100, (u.used_bytes / u.quota_bytes) * 100);
+  });
+
+  refresh(): void {
+    this.http.get<StorageUsage>(`${this.base}/usage`).subscribe({
+      next: data => this._usage.set(data),
+      error: ()   => {},
+    });
   }
 }

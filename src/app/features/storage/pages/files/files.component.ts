@@ -9,6 +9,7 @@ import { Subject, catchError, debounceTime, distinctUntilChanged, finalize, fork
 
 import { AuthService } from '../../../../core/services/auth.service';
 import { ShareItem, SharingService } from '../../../../core/services/sharing.service';
+import { StorageUsageService } from '../../../../core/services/storage-usage.service';
 import { ToastService } from '../../../../core/services/toast.service';
 import { FileItem } from '../../models/file-item.model';
 import { BreadcrumbItem, FolderItem } from '../../models/folder.model';
@@ -32,6 +33,7 @@ export class FilesComponent implements OnInit {
   private readonly filesService = inject(FilesService);
   private readonly sharingService = inject(SharingService);
   private readonly auth = inject(AuthService);
+  private readonly usageSvc = inject(StorageUsageService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
 
@@ -518,6 +520,7 @@ export class FilesComponent implements OnInit {
           this.toast.success(`Файл «${file.name}» загружен.`);
           this.selectedFile.set(null);
           this.loadContent();
+          this.usageSvc.refresh();
         },
         error: (err: unknown) => {
           this.selectedFile.set(null);
@@ -556,6 +559,7 @@ export class FilesComponent implements OnInit {
       next: () => {
         this.toast.success(`Файл «${file.file_name}» удалён.`);
         this.loadContent();
+        this.usageSvc.refresh();
       },
       error: () => this.toast.error(`Не удалось удалить «${file.file_name}».`),
     });

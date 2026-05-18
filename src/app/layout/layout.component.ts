@@ -3,7 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { AuthService } from '../core/services/auth.service';
-import { StorageUsageService, StorageUsage } from '../core/services/storage-usage.service';
+import { StorageUsageService } from '../core/services/storage-usage.service';
 
 @Component({
   selector: 'app-layout',
@@ -17,19 +17,11 @@ export class LayoutComponent implements OnInit {
   private readonly router       = inject(Router);
   private readonly usageSvc     = inject(StorageUsageService);
 
-  readonly storageUsage = signal<StorageUsage | null>(null);
-
-  readonly storagePct = computed(() => {
-    const u = this.storageUsage();
-    if (!u || u.quota_bytes <= 0) return 0;
-    return Math.min(100, (u.used_bytes / u.quota_bytes) * 100);
-  });
+  readonly storageUsage = this.usageSvc.usage;
+  readonly storagePct   = this.usageSvc.pct;
 
   ngOnInit(): void {
-    this.usageSvc.getUsage().subscribe({
-      next: data => this.storageUsage.set(data),
-      error: ()   => {},
-    });
+    this.usageSvc.refresh();
   }
 
   formatBytes(bytes: number): string {
