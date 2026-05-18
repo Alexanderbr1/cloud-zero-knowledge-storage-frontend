@@ -1,0 +1,175 @@
+<div class="page-container">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div class="breadcrumb">
+      <a routerLink="/files" class="breadcrumb__back">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Мой диск
+      </a>
+      <span class="breadcrumb__sep" aria-hidden="true">/</span>
+      <span class="breadcrumb__current">Активность</span>
+    </div>
+  </div>
+
+  <div class="activity-card card">
+    <div class="card-header">
+      <h2 class="card-title">Журнал активности</h2>
+      <p class="card-subtitle">Все действия в вашем аккаунте за последнее время</p>
+    </div>
+
+    @if (!loading() && !error() && events().length > 0) {
+      <!-- Filter + Search toolbar -->
+      <div class="filter-toolbar">
+        <div class="filter-group" role="group" aria-label="Фильтр по категории">
+          <button type="button" class="filter-btn" [class.is-active]="activeFilter() === 'all'"
+            (click)="setFilter('all')">Все</button>
+          <button type="button" class="filter-btn" [class.is-active]="activeFilter() === 'files'"
+            (click)="setFilter('files')">Файлы</button>
+          <button type="button" class="filter-btn" [class.is-active]="activeFilter() === 'folders'"
+            (click)="setFilter('folders')">Папки</button>
+          <button type="button" class="filter-btn" [class.is-active]="activeFilter() === 'auth'"
+            (click)="setFilter('auth')">Сессии</button>
+        </div>
+        <div class="search-box">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M9.5 9.5l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          <input class="search-input" type="search" placeholder="Поиск…" autocomplete="off"
+            [value]="searchQuery()" (input)="onSearchInput($event)" aria-label="Поиск по журналу"/>
+        </div>
+      </div>
+    }
+
+    @if (loading()) {
+      <div class="state-empty">
+        <div class="spinner" aria-label="Загрузка…"></div>
+      </div>
+    } @else if (error()) {
+      <div class="state-empty">
+        <p class="text-secondary">{{ error() }}</p>
+        <button type="button" class="btn btn--secondary" (click)="load()">Повторить</button>
+      </div>
+    } @else if (events().length === 0) {
+      <div class="state-empty">
+        <p class="text-secondary">Нет записей об активности</p>
+      </div>
+    } @else if (filteredEvents().length === 0) {
+      <div class="state-empty">
+        <p class="text-secondary">Ничего не найдено</p>
+        <button type="button" class="btn btn--secondary" (click)="clearFilters()">Сбросить фильтры</button>
+      </div>
+    } @else {
+      <ul class="event-list" aria-label="Журнал активности">
+        @for (event of filteredEvents(); track event.id) {
+          <li class="event-item">
+            <div [class]="'event-icon ' + eventIconClass(event.event_type)" aria-hidden="true">
+
+              @switch (eventIconType(event.event_type)) {
+
+                @case ('auth') {
+                  <!-- Person -->
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <circle cx="7" cy="4.5" r="2" stroke="currentColor" stroke-width="1.3"/>
+                    <path d="M2 13c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  </svg>
+                }
+
+                @case ('upload') {
+                  <!-- Arrow up from tray -->
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M7 9V2M4 5l3-3 3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 11h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  </svg>
+                }
+
+                @case ('download') {
+                  <!-- Arrow down to tray -->
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M7 2v7M4 7l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 11h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  </svg>
+                }
+
+                @case ('trash') {
+                  <!-- Trash can -->
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M2 4h10M5 4V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V4M3.5 4l.75 7.5h5.5L10.5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                }
+
+                @case ('restore') {
+                  <!-- Refresh / undo arrow -->
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M2.5 7A4.5 4.5 0 1 0 4 3.5L2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 5V2h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                }
+
+                @case ('share') {
+                  <!-- Share / link -->
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <circle cx="11" cy="3" r="1.5" stroke="currentColor" stroke-width="1.3"/>
+                    <circle cx="11" cy="11" r="1.5" stroke="currentColor" stroke-width="1.3"/>
+                    <circle cx="3" cy="7" r="1.5" stroke="currentColor" stroke-width="1.3"/>
+                    <path d="M4.4 6.2l5.2-2.7M4.4 7.8l5.2 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  </svg>
+                }
+
+                @case ('file') {
+                  <!-- File -->
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M3 2h5.5L11 4.5V12a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 3 12V2z" stroke="currentColor" stroke-width="1.25"/>
+                    <path d="M8.5 2v3H11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+                  </svg>
+                }
+
+                @default {
+                  <!-- Folder -->
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M1.5 4A1.5 1.5 0 0 1 3 2.5h2.94a1.5 1.5 0 0 1 1.06.44l.56.56a1.5 1.5 0 0 0 1.06.44H11A1.5 1.5 0 0 1 12.5 5.5v5A1.5 1.5 0 0 1 11 12H3A1.5 1.5 0 0 1 1.5 10.5V4z" stroke="currentColor" stroke-width="1.25"/>
+                  </svg>
+                }
+
+              }
+            </div>
+
+            <div class="event-body">
+              <div class="event-title">{{ eventLabel(event.event_type) }}</div>
+              @if (event.resource_name) {
+                <div class="event-resource">{{ event.resource_name }}</div>
+              }
+              <div class="event-meta">
+                <span>{{ event.created_at | date:'dd.MM.yyyy HH:mm' }}</span>
+                @if (event.device_name) {
+                  <span class="event-meta__sep" aria-hidden="true">·</span>
+                  <span>{{ event.device_name }}</span>
+                }
+                @if (event.ip_address) {
+                  <span class="event-meta__sep" aria-hidden="true">·</span>
+                  <span>{{ event.ip_address }}</span>
+                }
+              </div>
+            </div>
+          </li>
+        }
+      </ul>
+
+      @if (hasMore() && activeFilter() === 'all' && !searchQuery()) {
+        <div class="load-more">
+          <button type="button" class="btn btn--secondary" [disabled]="loadingMore()" (click)="loadMore()">
+            @if (loadingMore()) {
+              Загрузка…
+            } @else {
+              Показать ещё
+            }
+          </button>
+        </div>
+      }
+    }
+  </div>
+
+</div>

@@ -1,7 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
-  Component, DestroyRef, ElementRef, HostListener, OnInit,
+  Component, DestroyRef, ElementRef, HostListener, NgZone, OnInit,
   ViewChild, computed, inject, signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -35,6 +35,7 @@ export class FilesComponent implements OnInit {
   private readonly usageSvc = inject(StorageUsageService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
+  private readonly ngZone = inject(NgZone);
 
   @ViewChild('fileInput')       private fileInputRef?: ElementRef<HTMLInputElement>;
   @ViewChild('shareEmailInput') private shareEmailInputRef?: ElementRef<HTMLInputElement>;
@@ -488,14 +489,20 @@ export class FilesComponent implements OnInit {
     this.isSelectingFile.set(false);
     const input = event.target as HTMLInputElement;
     const file  = input.files?.item(0) ?? null;
+    input.value = '';
     if (!file) return;
+    if (file.size > 1024 * 1024 * 1024) {
+      this.toast.error('Файл слишком большой. Максимальный размер — 1 ГБ.');
+      return;
+    }
     this.selectedFile.set(file);
     this.upload();
   }
 
   openFilePicker(): void {
     this.isSelectingFile.set(true);
-    this.fileInputRef?.nativeElement.click();
+    const el = this.fileInputRef?.nativeElement;
+    this.ngZone.runOutsideAngular(() => el?.click());
   }
 
   upload(): void {

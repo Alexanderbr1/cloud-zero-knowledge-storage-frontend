@@ -31,6 +31,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/sessions/pages/profile/profile.component').then(m => m.ProfileComponent),
       },
+      {
+        path: 'activity',
+        loadComponent: () =>
+          import('./features/audit/pages/activity/activity.component').then(m => m.ActivityComponent),
+      },
     ],
   },
 ];
