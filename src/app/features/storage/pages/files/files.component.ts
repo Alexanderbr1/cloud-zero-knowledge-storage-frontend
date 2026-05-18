@@ -5,7 +5,7 @@ import {
   ViewChild, computed, inject, signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, catchError, debounceTime, distinctUntilChanged, finalize, forkJoin, from, of, switchMap } from 'rxjs';
+import { Subject, Subscription, catchError, debounceTime, distinctUntilChanged, finalize, forkJoin, from, of, switchMap } from 'rxjs';
 
 import { AuthService } from '../../../../core/services/auth.service';
 import { ShareItem, SharingService } from '../../../../core/services/sharing.service';
@@ -48,6 +48,7 @@ export class FilesComponent implements OnInit {
   readonly uploadProgress   = signal(0);
   readonly isUploading      = computed(() => this.uploadPhase() !== 'idle');
   readonly selectedFile     = signal<File | null>(null);
+  private uploadSub: Subscription | null = null;
 
   // ─── Folder navigation ────────────────────────────────────────────────────
 
@@ -504,7 +505,7 @@ export class FilesComponent implements OnInit {
     this.uploadPhase.set('reading');
     this.uploadProgress.set(0);
 
-    this.filesService
+    this.uploadSub = this.filesService
       .uploadFile(
         file,
         (phase, pct) => { this.uploadPhase.set(phase); this.uploadProgress.set(pct); },
@@ -512,6 +513,7 @@ export class FilesComponent implements OnInit {
       )
       .pipe(
         finalize(() => {
+          this.uploadSub = null;
           this.uploadPhase.set('idle');
           this.uploadProgress.set(0);
           if (this.fileInputRef) this.fileInputRef.nativeElement.value = '';
@@ -535,6 +537,11 @@ export class FilesComponent implements OnInit {
           this.toast.error('Не удалось загрузить файл.');
         },
       });
+  }
+
+  cancelUpload(): void {
+    this.uploadSub?.unsubscribe();
+    this.selectedFile.set(null);
   }
 
   // ─── File download / delete ───────────────────────────────────────────────
