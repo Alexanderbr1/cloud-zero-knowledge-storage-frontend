@@ -2,11 +2,10 @@ import { Component, input, output } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
 @Component({
-  selector: 'app-unlock-panel',
-  standalone: true,
-  imports: [ReactiveFormsModule],
-  templateUrl: './unlock-panel.component.html',
-  styleUrl: './unlock-panel.component.scss',
+    selector: 'app-unlock-panel',
+    imports: [ReactiveFormsModule],
+    templateUrl: './unlock-panel.component.html',
+    styleUrl: './unlock-panel.component.scss'
 })
 export class UnlockPanelComponent {
   email = input.required<string>();

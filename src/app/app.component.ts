@@ -10,10 +10,9 @@ import { UnlockPanelComponent } from './features/auth/components/unlock-panel/un
 import { ToastComponent } from './core/components/toast/toast.component';
 
 @Component({
-  selector: 'app-root',
-  standalone: true,
-  imports: [RouterOutlet, AuthPanelComponent, UnlockPanelComponent, ToastComponent],
-  template: `
+    selector: 'app-root',
+    imports: [RouterOutlet, AuthPanelComponent, UnlockPanelComponent, ToastComponent],
+    template: `
     @switch (appState()) {
       @case ('checking') {
         <div class="app-loading" aria-label="Загрузка" aria-busy="true"></div>
@@ -43,14 +42,14 @@ import { ToastComponent } from './core/components/toast/toast.component';
     }
     <app-toast />
   `,
-  styles: [`
+    styles: [`
     .app-loading {
       display: flex;
       min-height: 100vh;
       min-height: 100dvh;
       background: var(--c-bg);
     }
-  `],
+  `]
 })
 export class AppComponent implements OnInit {
   protected readonly auth = inject(AuthService);

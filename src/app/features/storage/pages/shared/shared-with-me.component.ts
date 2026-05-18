@@ -9,12 +9,11 @@ import { ShareItem, SharingService } from '../../../../core/services/sharing.ser
 import { shortMimeType, triggerBrowserDownload } from '../../../../core/utils/browser.utils';
 
 @Component({
-  selector: 'app-shared-with-me',
-  standalone: true,
-  imports: [DatePipe],
-  templateUrl: './shared-with-me.component.html',
-  styleUrl: './shared-with-me.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: 'app-shared-with-me',
+    imports: [DatePipe],
+    templateUrl: './shared-with-me.component.html',
+    styleUrl: './shared-with-me.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SharedWithMeComponent implements OnInit {
   private readonly sharingService = inject(SharingService);

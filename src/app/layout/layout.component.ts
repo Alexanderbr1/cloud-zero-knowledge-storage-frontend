@@ -6,11 +6,10 @@ import { AuthService } from '../core/services/auth.service';
 import { StorageUsageService } from '../core/services/storage-usage.service';
 
 @Component({
-  selector: 'app-layout',
-  standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, DecimalPipe],
-  templateUrl: './layout.component.html',
-  styleUrl: './layout.component.scss',
+    selector: 'app-layout',
+    imports: [RouterOutlet, RouterLink, RouterLinkActive, DecimalPipe],
+    templateUrl: './layout.component.html',
+    styleUrl: './layout.component.scss'
 })
 export class LayoutComponent implements OnInit {
   private readonly auth         = inject(AuthService);

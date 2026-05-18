@@ -2,11 +2,10 @@ import { Component, computed, input, output } from '@angular/core';
 import { AbstractControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 
 @Component({
-  selector: 'app-auth-panel',
-  standalone: true,
-  imports: [ReactiveFormsModule],
-  templateUrl: './auth-panel.component.html',
-  styleUrl: './auth-panel.component.scss'
+    selector: 'app-auth-panel',
+    imports: [ReactiveFormsModule],
+    templateUrl: './auth-panel.component.html',
+    styleUrl: './auth-panel.component.scss'
 })
 export class AuthPanelComponent {
   credentialsForm = input.required<FormGroup>();

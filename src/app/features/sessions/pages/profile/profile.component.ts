@@ -5,11 +5,10 @@ import { AuthService } from '../../../../core/services/auth.service';
 import { SessionsComponent } from '../../components/sessions-list/sessions.component';
 
 @Component({
-  selector: 'app-profile',
-  standalone: true,
-  imports: [RouterLink, SessionsComponent],
-  templateUrl: './profile.component.html',
-  styleUrl: './profile.component.scss',
+    selector: 'app-profile',
+    imports: [RouterLink, SessionsComponent],
+    templateUrl: './profile.component.html',
+    styleUrl: './profile.component.scss'
 })
 export class ProfileComponent {
   private readonly auth = inject(AuthService);

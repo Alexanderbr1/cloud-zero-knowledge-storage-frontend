@@ -23,11 +23,10 @@ interface SearchResults {
 }
 
 @Component({
-  selector: 'app-files',
-  standalone: true,
-  imports: [DatePipe, InputModalComponent],
-  templateUrl: './files.component.html',
-  styleUrl: './files.component.scss',
+    selector: 'app-files',
+    imports: [DatePipe, InputModalComponent],
+    templateUrl: './files.component.html',
+    styleUrl: './files.component.scss'
 })
 export class FilesComponent implements OnInit {
   private readonly filesService = inject(FilesService);

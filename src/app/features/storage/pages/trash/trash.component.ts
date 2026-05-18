@@ -16,12 +16,11 @@ import { FilesService } from '../../services/files.service';
 import { TrashFileItem, TrashFolderItem } from '../../models/trash.model';
 
 @Component({
-  selector: 'app-trash',
-  standalone: true,
-  imports: [DatePipe],
-  templateUrl: './trash.component.html',
-  styleUrl: './trash.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: 'app-trash',
+    imports: [DatePipe],
+    templateUrl: './trash.component.html',
+    styleUrl: './trash.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TrashComponent implements OnInit {
   private readonly filesService = inject(FilesService);

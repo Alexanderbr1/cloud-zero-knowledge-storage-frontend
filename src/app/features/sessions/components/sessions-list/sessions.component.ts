@@ -6,12 +6,11 @@ import { DeviceSession } from '../../models/session.model';
 import { SessionsService } from '../../services/sessions.service';
 
 @Component({
-  selector: 'app-sessions',
-  standalone: true,
-  imports: [],
-  templateUrl: './sessions.component.html',
-  styleUrl: './sessions.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: 'app-sessions',
+    imports: [],
+    templateUrl: './sessions.component.html',
+    styleUrl: './sessions.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SessionsComponent implements OnInit {
   private readonly sessionsService = inject(SessionsService);
