@@ -1,0 +1,218 @@
+:host { display: flex; flex-direction: column; flex: 1; }
+
+.page-container { flex: 1; display: flex; flex-direction: column; }
+
+/* ─── Table structure ─────────────────────────────────────────────────────── */
+.table-head,
+.table-row {
+  display: grid;
+  grid-template-columns: 1fr 90px 72px 100px 80px;
+  align-items: center;
+  gap: 12px;
+}
+
+.table-head {
+  padding: 9px 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  user-select: none;
+}
+
+.table-list { list-style: none; }
+
+.table-row {
+  padding: 11px 20px;
+  border-bottom: 1px solid var(--c-border);
+  transition: background var(--t-fast);
+  min-height: 48px;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: var(--c-surface-hover); }
+}
+
+/* ─── Skeleton rows ───────────────────────────────────────────────────────── */
+.table-row--skeleton {
+  animation: none !important;
+  pointer-events: none;
+}
+
+.skeleton--icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  flex-shrink: 0;
+}
+
+.skeleton--name {
+  height: 13px;
+  width: 55%;
+  border-radius: var(--r-sm);
+}
+
+.skeleton--cell {
+  height: 13px;
+  width: 70%;
+  border-radius: var(--r-sm);
+}
+
+/* ─── Columns ─────────────────────────────────────────────────────────────── */
+.files-card { overflow: hidden; flex: 1; display: flex; flex-direction: column; }
+
+.col-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.col-type,
+.col-size,
+.col-date {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* ─── File / folder icon ──────────────────────────────────────────────────── */
+.file-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
+  background: var(--c-primary-subtle);
+  color: var(--c-primary);
+}
+
+.file-icon--folder {
+  color: var(--c-primary);
+  background: var(--c-primary-subtle);
+}
+
+.file-name-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--c-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-location {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Action buttons ──────────────────────────────────────────────────────── */
+.col-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t);
+}
+
+.table-row:hover .col-actions,
+.table-row:focus-within .col-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ─── Star button ─────────────────────────────────────────────────────────── */
+.star-btn {
+  color: var(--c-text-muted);
+  transition: color var(--t-fast), background var(--t-fast);
+
+  &:hover:not(:disabled) { color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+
+  &--active {
+    color: #f59e0b;
+    &:hover:not(:disabled) { color: #d97706; background: rgba(245, 158, 11, 0.12); }
+  }
+}
+
+/* ─── Empty state ─────────────────────────────────────────────────────────── */
+.table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 10px;
+  padding: 40px 24px;
+  text-align: center;
+  animation: fadeIn 0.3s ease both;
+}
+
+.empty-illustration { flex-shrink: 0; color: var(--c-border-strong); }
+
+.empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text);
+  margin: 0;
+}
+
+.empty-hint {
+  font-size: 13px;
+  margin: 0;
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+/* ─── Touch devices ───────────────────────────────────────────────────────── */
+@media (hover: none) and (pointer: coarse) {
+  .col-actions { opacity: 1; pointer-events: auto; }
+}
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+@media (min-width: 769px) and (max-width: 939px) {
+  .table-head,
+  .table-row { grid-template-columns: 1fr 72px 100px 80px; }
+  .col-type  { display: none !important; }
+}
+
+@media (max-width: 700px) {
+  .table-head,
+  .table-row { grid-template-columns: 1fr 72px 100px 80px; }
+  .col-type  { display: none !important; }
+}
+
+@media (max-width: 560px) {
+  .table-head,
+  .table-row { grid-template-columns: 1fr 90px 80px; }
+  .col-type,
+  .col-size  { display: none !important; }
+}
+
+@media (max-width: 460px) {
+  .table-head,
+  .table-row {
+    grid-template-columns: 1fr 80px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .col-type,
+  .col-size,
+  .col-date  { display: none !important; }
+}

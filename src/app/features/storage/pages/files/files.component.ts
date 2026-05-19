@@ -14,6 +14,7 @@ import { ToastService } from '../../../../core/services/toast.service';
 import { FileItem } from '../../models/file-item.model';
 import { BreadcrumbItem, FolderItem } from '../../models/folder.model';
 import { FilesService } from '../../services/files.service';
+import { FavoritesService } from '../../../favorites/services/favorites.service';
 import { shortMimeType } from '../../../../core/utils/browser.utils';
 import { InputModalComponent } from '../../../../shared/components/input-modal/input-modal.component';
 
@@ -29,13 +30,14 @@ interface SearchResults {
     styleUrl: './files.component.scss'
 })
 export class FilesComponent implements OnInit {
-  private readonly filesService = inject(FilesService);
-  private readonly sharingService = inject(SharingService);
-  private readonly auth = inject(AuthService);
-  private readonly usageSvc = inject(StorageUsageService);
-  private readonly destroyRef = inject(DestroyRef);
-  private readonly toast = inject(ToastService);
-  private readonly ngZone = inject(NgZone);
+  private readonly filesService     = inject(FilesService);
+  private readonly sharingService   = inject(SharingService);
+  private readonly favoritesService = inject(FavoritesService);
+  private readonly auth             = inject(AuthService);
+  private readonly usageSvc         = inject(StorageUsageService);
+  private readonly destroyRef       = inject(DestroyRef);
+  private readonly toast            = inject(ToastService);
+  private readonly ngZone           = inject(NgZone);
 
   @ViewChild('fileInput')       private fileInputRef?: ElementRef<HTMLInputElement>;
   @ViewChild('shareEmailInput') private shareEmailInputRef?: ElementRef<HTMLInputElement>;
@@ -150,6 +152,15 @@ export class FilesComponent implements OnInit {
   readonly draggingId       = signal<string | null>(null);
   readonly dragOverFolderId = signal<string | null>(null);
 
+  // ─── Favorites ────────────────────────────────────────────────────────────
+
+  readonly favoriteBlobIds   = signal<Set<string>>(new Set());
+  readonly favoriteFolderIds = signal<Set<string>>(new Set());
+
+  // ─── Overflow menu ────────────────────────────────────────────────────────
+
+  readonly openMenuId = signal<string | null>(null);
+
   // ─── Folder download ──────────────────────────────────────────────────────
 
   readonly downloadingFolderId = signal<string | null>(null);
@@ -217,10 +228,17 @@ export class FilesComponent implements OnInit {
     });
 
     this.loadContent();
+    this.loadFavorites();
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    this.openMenuId.set(null);
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    if (this.openMenuId())        { this.closeMenu(); return; }
     if (this.accessFile())        { this.closeAccessDialog(); return; }
     if (this.renameTarget())      { this.closeRenameModal(); return; }
     if (this.isCreatingFolder())  { this.cancelCreateFolder(); }
@@ -709,6 +727,77 @@ export class FilesComponent implements OnInit {
       next: () => this.fileShares.update(list => list.filter(s => s.share_id !== shareId)),
       error: () => this.shareError.set('Не удалось отозвать доступ.'),
     });
+  }
+
+  // ─── Favorites ────────────────────────────────────────────────────────────
+
+  private loadFavorites(): void {
+    this.favoritesService.list().pipe(
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: ({ blobs, folders }) => {
+        this.favoriteBlobIds.set(new Set(blobs.map(b => b.blob_id)));
+        this.favoriteFolderIds.set(new Set(folders.map(f => f.folder_id)));
+      },
+      error: () => {},
+    });
+  }
+
+  toggleBlobFavorite(file: FileItem, event: Event): void {
+    event.stopPropagation();
+    const wasStarred = this.favoriteBlobIds().has(file.blob_id);
+    this.favoriteBlobIds.update(s => {
+      const next = new Set(s);
+      wasStarred ? next.delete(file.blob_id) : next.add(file.blob_id);
+      return next;
+    });
+    const req = wasStarred
+      ? this.favoritesService.removeBlob(file.blob_id)
+      : this.favoritesService.addBlob(file.blob_id);
+    req.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      error: () => {
+        this.favoriteBlobIds.update(s => {
+          const prev = new Set(s);
+          wasStarred ? prev.add(file.blob_id) : prev.delete(file.blob_id);
+          return prev;
+        });
+        this.toast.error(wasStarred ? 'Не удалось убрать из избранного.' : 'Не удалось добавить в избранное.');
+      },
+    });
+  }
+
+  toggleFolderFavorite(folder: FolderItem, event: Event): void {
+    event.stopPropagation();
+    const wasStarred = this.favoriteFolderIds().has(folder.folder_id);
+    this.favoriteFolderIds.update(s => {
+      const next = new Set(s);
+      wasStarred ? next.delete(folder.folder_id) : next.add(folder.folder_id);
+      return next;
+    });
+    const req = wasStarred
+      ? this.favoritesService.removeFolder(folder.folder_id)
+      : this.favoritesService.addFolder(folder.folder_id);
+    req.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      error: () => {
+        this.favoriteFolderIds.update(s => {
+          const prev = new Set(s);
+          wasStarred ? prev.add(folder.folder_id) : prev.delete(folder.folder_id);
+          return prev;
+        });
+        this.toast.error(wasStarred ? 'Не удалось убрать из избранного.' : 'Не удалось добавить в избранное.');
+      },
+    });
+  }
+
+  // ─── Overflow menu ────────────────────────────────────────────────────────
+
+  toggleMenu(id: string, event: Event): void {
+    event.stopPropagation();
+    this.openMenuId.update(cur => (cur === id ? null : id));
+  }
+
+  closeMenu(): void {
+    this.openMenuId.set(null);
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────

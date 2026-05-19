@@ -48,6 +48,13 @@
         </svg>
         Активность
       </a>
+      <a routerLink="/favorites" routerLinkActive="sidebar__link--active" class="sidebar__link" (click)="closeMenu()">
+        <svg class="sidebar__link-icon" width="17" height="17" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M7 1.5l1.854 3.756 4.146.602-3 2.924.708 4.128L7 10.75l-3.708 1.96.708-4.128L1 5.858l4.146-.602L7 1.5z"
+                stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>
+        </svg>
+        Избранное
+      </a>
     </nav>
 
     <div class="sidebar__spacer"></div>

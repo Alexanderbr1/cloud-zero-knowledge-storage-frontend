@@ -296,10 +296,23 @@
               <span class="col-type text-secondary text-sm">Папка</span>
               <span class="col-size text-secondary text-sm">—</span>
               <span class="col-date text-secondary text-sm">{{ folder.created_at | date: 'dd.MM.yyyy' }}</span>
-              <div class="col-actions" (click)="$event.stopPropagation()">
+              <div class="col-actions" [class.col-actions--open]="openMenuId() === folder.folder_id" (click)="$event.stopPropagation()">
                 <button
                   type="button"
-                  class="btn btn--ghost btn--sm btn--icon"
+                  class="btn btn--ghost btn--sm btn--icon star-btn"
+                  [class.star-btn--active]="favoriteFolderIds().has(folder.folder_id)"
+                  [attr.aria-label]="(favoriteFolderIds().has(folder.folder_id) ? 'Убрать из избранного: ' : 'В избранное: ') + folder.name"
+                  (click)="toggleFolderFavorite(folder, $event)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"
+                       [attr.fill]="favoriteFolderIds().has(folder.folder_id) ? 'currentColor' : 'none'">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                          stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn--ghost btn--sm btn--icon btn--direct"
                   [attr.aria-label]="'Скачать папку ' + folder.name"
                   [disabled]="downloadingFolderId() === folder.folder_id"
                   (click)="downloadFolder(folder, $event)"
@@ -317,7 +330,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn--ghost btn--sm btn--icon"
+                  class="btn btn--ghost btn--sm btn--icon btn--direct"
                   [attr.aria-label]="'Переименовать ' + folder.name"
                   (click)="openRenameModal({type: 'folder', id: folder.folder_id, name: folder.name}, $event)"
                 >
@@ -325,16 +338,59 @@
                     <path d="M9 2l2 2-7 7H2v-2L9 2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
                   </svg>
                 </button>
-                <button
-                  type="button"
-                  class="btn btn--ghost btn--sm btn--icon btn--icon-danger"
-                  [attr.aria-label]="'Удалить ' + folder.name"
-                  (click)="deleteFolder(folder, $event)"
-                >
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-                    <path d="M2 3.5h9M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5 6v3M8 6v3M2.5 3.5l.8 7A1 1 0 0 0 4.3 11.5h4.4a1 1 0 0 0 1-.9l.8-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </button>
+                <div class="menu-wrap">
+                  <button
+                    type="button"
+                    class="btn btn--ghost btn--sm btn--icon"
+                    [class.btn--active]="openMenuId() === folder.folder_id"
+                    [attr.aria-label]="'Действия с папкой ' + folder.name"
+                    (click)="toggleMenu(folder.folder_id, $event)"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                      <circle cx="7.5" cy="3" r="1.2" fill="currentColor"/>
+                      <circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"/>
+                      <circle cx="7.5" cy="12" r="1.2" fill="currentColor"/>
+                    </svg>
+                  </button>
+                  @if (openMenuId() === folder.folder_id) {
+                    <div class="dropdown-menu" role="menu">
+                      <button type="button" role="menuitem" class="dropdown-item"
+                              (click)="toggleFolderFavorite(folder, $event); closeMenu()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"
+                             [attr.fill]="favoriteFolderIds().has(folder.folder_id) ? 'currentColor' : 'none'">
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                                stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                        </svg>
+                        {{ favoriteFolderIds().has(folder.folder_id) ? 'Убрать из избранного' : 'В избранное' }}
+                      </button>
+                      <hr class="dropdown-divider">
+                      <button type="button" role="menuitem" class="dropdown-item"
+                              [disabled]="!!downloadingFolderId()"
+                              (click)="downloadFolder(folder, $event); closeMenu()">
+                        <svg width="14" height="14" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                          <path d="M7.5 2v8M4 7l3.5 3.5L11 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                          <path d="M2 12h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                        </svg>
+                        Скачать
+                      </button>
+                      <button type="button" role="menuitem" class="dropdown-item"
+                              (click)="openRenameModal({type: 'folder', id: folder.folder_id, name: folder.name}, $event); closeMenu()">
+                        <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                          <path d="M9 2l2 2-7 7H2v-2L9 2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+                        </svg>
+                        Переименовать
+                      </button>
+                      <hr class="dropdown-divider">
+                      <button type="button" role="menuitem" class="dropdown-item dropdown-item--danger"
+                              (click)="deleteFolder(folder, $event); closeMenu()">
+                        <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                          <path d="M2 3.5h9M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5 6v3M8 6v3M2.5 3.5l.8 7A1 1 0 0 0 4.3 11.5h4.4a1 1 0 0 0 1-.9l.8-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Удалить
+                      </button>
+                    </div>
+                  }
+                </div>
               </div>
             </li>
           }
@@ -372,20 +428,23 @@
               <span class="col-type text-secondary text-sm">{{ shortType(file.content_type) }}</span>
               <span class="col-size text-secondary text-sm">{{ formatSize(file.file_size) }}</span>
               <span class="col-date text-secondary text-sm">{{ file.created_at | date: 'dd.MM.yyyy' }}</span>
-              <div class="col-actions" (click)="$event.stopPropagation()">
+              <div class="col-actions" [class.col-actions--open]="openMenuId() === file.blob_id" (click)="$event.stopPropagation()">
                 <button
                   type="button"
-                  class="btn btn--ghost btn--sm btn--icon"
-                  [attr.aria-label]="'Переименовать ' + file.file_name"
-                  (click)="openRenameModal({type: 'file', id: file.blob_id, name: file.file_name}, $event)"
+                  class="btn btn--ghost btn--sm btn--icon star-btn"
+                  [class.star-btn--active]="favoriteBlobIds().has(file.blob_id)"
+                  [attr.aria-label]="(favoriteBlobIds().has(file.blob_id) ? 'Убрать из избранного: ' : 'В избранное: ') + file.file_name"
+                  (click)="toggleBlobFavorite(file, $event)"
                 >
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-                    <path d="M9 2l2 2-7 7H2v-2L9 2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+                  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"
+                       [attr.fill]="favoriteBlobIds().has(file.blob_id) ? 'currentColor' : 'none'">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                          stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
                   </svg>
                 </button>
                 <button
                   type="button"
-                  class="btn btn--ghost btn--sm btn--icon"
+                  class="btn btn--ghost btn--sm btn--icon btn--direct"
                   [attr.aria-label]="'Скачать ' + file.file_name"
                   (click)="download(file)"
                 >
@@ -396,8 +455,18 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn--ghost btn--sm btn--icon"
-                  [attr.aria-label]="'Управление доступом — ' + file.file_name"
+                  class="btn btn--ghost btn--sm btn--icon btn--direct"
+                  [attr.aria-label]="'Переименовать ' + file.file_name"
+                  (click)="openRenameModal({type: 'file', id: file.blob_id, name: file.file_name}, $event)"
+                >
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                    <path d="M9 2l2 2-7 7H2v-2L9 2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn--ghost btn--sm btn--icon btn--direct"
+                  [attr.aria-label]="'Поделиться ' + file.file_name"
                   (click)="openAccessDialog(file)"
                 >
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
@@ -407,16 +476,68 @@
                     <path d="M5 8.4l5 2.7M5 6.6L10 3.9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
                   </svg>
                 </button>
-                <button
-                  type="button"
-                  class="btn btn--ghost btn--sm btn--icon btn--icon-danger"
-                  [attr.aria-label]="'Удалить ' + file.file_name"
-                  (click)="delete(file)"
-                >
-                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-                    <path d="M2 4h11M5 4V2.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5V4M6 7v4M9 7v4M3.5 4l.8 8a1 1 0 0 0 1 .9h4.4a1 1 0 0 0 1-.9l.8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </button>
+                <div class="menu-wrap">
+                  <button
+                    type="button"
+                    class="btn btn--ghost btn--sm btn--icon"
+                    [class.btn--active]="openMenuId() === file.blob_id"
+                    [attr.aria-label]="'Действия с файлом ' + file.file_name"
+                    (click)="toggleMenu(file.blob_id, $event)"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                      <circle cx="7.5" cy="3" r="1.2" fill="currentColor"/>
+                      <circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"/>
+                      <circle cx="7.5" cy="12" r="1.2" fill="currentColor"/>
+                    </svg>
+                  </button>
+                  @if (openMenuId() === file.blob_id) {
+                    <div class="dropdown-menu" role="menu">
+                      <button type="button" role="menuitem" class="dropdown-item"
+                              (click)="toggleBlobFavorite(file, $event); closeMenu()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"
+                             [attr.fill]="favoriteBlobIds().has(file.blob_id) ? 'currentColor' : 'none'">
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                                stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                        </svg>
+                        {{ favoriteBlobIds().has(file.blob_id) ? 'Убрать из избранного' : 'В избранное' }}
+                      </button>
+                      <hr class="dropdown-divider">
+                      <button type="button" role="menuitem" class="dropdown-item"
+                              (click)="download(file); closeMenu()">
+                        <svg width="14" height="14" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                          <path d="M7.5 2v8M4 7l3.5 3.5L11 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                          <path d="M2 12h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                        </svg>
+                        Скачать
+                      </button>
+                      <button type="button" role="menuitem" class="dropdown-item"
+                              (click)="openRenameModal({type: 'file', id: file.blob_id, name: file.file_name}, $event); closeMenu()">
+                        <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                          <path d="M9 2l2 2-7 7H2v-2L9 2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+                        </svg>
+                        Переименовать
+                      </button>
+                      <button type="button" role="menuitem" class="dropdown-item"
+                              (click)="openAccessDialog(file); closeMenu()">
+                        <svg width="14" height="14" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                          <circle cx="11.5" cy="2.5" r="1.5" stroke="currentColor" stroke-width="1.3"/>
+                          <circle cx="3.5" cy="7.5" r="1.5" stroke="currentColor" stroke-width="1.3"/>
+                          <circle cx="11.5" cy="12.5" r="1.5" stroke="currentColor" stroke-width="1.3"/>
+                          <path d="M5 8.4l5 2.7M5 6.6L10 3.9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                        </svg>
+                        Поделиться
+                      </button>
+                      <hr class="dropdown-divider">
+                      <button type="button" role="menuitem" class="dropdown-item dropdown-item--danger"
+                              (click)="delete(file); closeMenu()">
+                        <svg width="14" height="14" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                          <path d="M2 4h11M5 4V2.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5V4M6 7v4M9 7v4M3.5 4l.8 8a1 1 0 0 0 1 .9h4.4a1 1 0 0 0 1-.9l.8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Удалить
+                      </button>
+                    </div>
+                  }
+                </div>
               </div>
             </li>
           }

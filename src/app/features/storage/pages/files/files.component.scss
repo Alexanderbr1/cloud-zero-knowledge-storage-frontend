@@ -342,6 +342,79 @@
   background: var(--c-danger-bg);
 }
 
+.col-actions--open {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* ─── Star button ─────────────────────────────────────────────────────────── */
+.star-btn {
+  color: var(--c-text-muted);
+  transition: color var(--t-fast), background var(--t-fast);
+
+  &:hover:not(:disabled) { color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+
+  &--active {
+    color: #f59e0b;
+    &:hover:not(:disabled) { color: #d97706; background: rgba(245, 158, 11, 0.12); }
+  }
+}
+
+/* ─── Three-dots overflow menu ────────────────────────────────────────────── */
+.menu-wrap {
+  position: relative;
+}
+
+.btn--active {
+  background: var(--c-surface-hover);
+  color: var(--c-text);
+}
+
+.dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 200;
+  min-width: 160px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+  animation: scaleIn 0.12s var(--t-spring) both;
+  transform-origin: top right;
+}
+
+.dropdown-item {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  font-size: 13.5px;
+  color: var(--c-text);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+  white-space: nowrap;
+
+  &:hover:not(:disabled) { background: var(--c-surface-hover); }
+  &:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  &--danger {
+    color: var(--c-danger);
+    &:hover:not(:disabled) { background: var(--c-danger-bg); }
+  }
+}
+
+.dropdown-divider {
+  border: none;
+  border-top: 1px solid var(--c-border);
+  margin: 4px 0;
+}
+
 /* ─── Folder rows ─────────────────────────────────────────────────────────── */
 .table-row--folder {
   cursor: pointer;
@@ -691,7 +764,17 @@
   }
 }
 
+/* ─── Direct action buttons (shown inline on wide screens) ───────────────── */
+.btn--direct { display: none; }
+
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
+/* wide desktop: show extra inline buttons, wider actions column */
+@media (min-width: 1080px) {
+  .table-head,
+  .table-row { grid-template-columns: 1fr 90px 72px 100px 168px; }
+  .btn--direct { display: inline-flex; }
+}
+
 /* desktop with sidebar: viewport 769–939px → content 529–699px */
 @media (min-width: 769px) and (max-width: 939px) {
   .table-head,

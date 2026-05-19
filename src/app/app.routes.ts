@@ -36,6 +36,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/audit/pages/activity/activity.component').then(m => m.ActivityComponent),
       },
+      {
+        path: 'favorites',
+        loadComponent: () =>
+          import('./features/favorites/pages/favorites/favorites.component').then(m => m.FavoritesComponent),
+      },
     ],
   },
 ];
