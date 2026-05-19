@@ -14,10 +14,16 @@ import { shortMimeType } from '../../../../core/utils/browser.utils';
 import { StorageUsageService } from '../../../../core/services/storage-usage.service';
 import { FilesService } from '../../services/files.service';
 import { TrashFileItem, TrashFolderItem } from '../../models/trash.model';
+import { ConfirmModalComponent } from '../../../../shared/components/confirm-modal/confirm-modal.component';
+
+type PendingDelete =
+  | { type: 'blob';   item: TrashFileItem }
+  | { type: 'folder'; item: TrashFolderItem }
+  | { type: 'empty' };
 
 @Component({
     selector: 'app-trash',
-    imports: [DatePipe],
+    imports: [DatePipe, ConfirmModalComponent],
     templateUrl: './trash.component.html',
     styleUrl: './trash.component.scss',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -32,6 +38,8 @@ export class TrashComponent implements OnInit {
   readonly isLoading = signal(false);
   readonly actionMessage = signal('');
   readonly errorMessage = signal('');
+  readonly pendingDelete = signal<PendingDelete | null>(null);
+  readonly deleteLoading = signal(false);
 
   private readonly fadingOut = signal(new Set<string>());
 
@@ -81,16 +89,29 @@ export class TrashComponent implements OnInit {
   }
 
   hardDeleteBlob(item: TrashFileItem): void {
+    this.pendingDelete.set({ type: 'blob', item });
+  }
+
+  private doHardDeleteBlob(item: TrashFileItem): void {
+    this.deleteLoading.set(true);
     this.filesService.hardDeleteBlob(item.blob_id).pipe(
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: () => this.animateOut(item.blob_id, () => {
-        this.blobs.update(list => list.filter(b => b.blob_id !== item.blob_id));
-        this.actionMessage.set(`«${item.file_name}» удалён безвозвратно.`);
-        this.errorMessage.set('');
-        this.usageSvc.refresh();
-      }),
-      error: () => this.errorMessage.set(`Не удалось удалить «${item.file_name}».`),
+      next: () => {
+        this.pendingDelete.set(null);
+        this.deleteLoading.set(false);
+        this.animateOut(item.blob_id, () => {
+          this.blobs.update(list => list.filter(b => b.blob_id !== item.blob_id));
+          this.actionMessage.set(`«${item.file_name}» удалён безвозвратно.`);
+          this.errorMessage.set('');
+          this.usageSvc.refresh();
+        });
+      },
+      error: () => {
+        this.pendingDelete.set(null);
+        this.deleteLoading.set(false);
+        this.errorMessage.set(`Не удалось удалить «${item.file_name}».`);
+      },
     });
   }
 
@@ -108,33 +129,89 @@ export class TrashComponent implements OnInit {
   }
 
   hardDeleteFolder(item: TrashFolderItem): void {
+    this.pendingDelete.set({ type: 'folder', item });
+  }
+
+  private doHardDeleteFolder(item: TrashFolderItem): void {
+    this.deleteLoading.set(true);
     this.filesService.hardDeleteFolder(item.folder_id).pipe(
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: () => this.animateOut(item.folder_id, () => {
-        this.folders.update(list => list.filter(f => f.folder_id !== item.folder_id));
-        this.actionMessage.set(`«${item.name}» удалена безвозвратно.`);
-        this.errorMessage.set('');
-        this.usageSvc.refresh();
-      }),
-      error: () => this.errorMessage.set(`Не удалось удалить «${item.name}».`),
+      next: () => {
+        this.pendingDelete.set(null);
+        this.deleteLoading.set(false);
+        this.animateOut(item.folder_id, () => {
+          this.folders.update(list => list.filter(f => f.folder_id !== item.folder_id));
+          this.actionMessage.set(`«${item.name}» удалена безвозвратно.`);
+          this.errorMessage.set('');
+          this.usageSvc.refresh();
+        });
+      },
+      error: () => {
+        this.pendingDelete.set(null);
+        this.deleteLoading.set(false);
+        this.errorMessage.set(`Не удалось удалить «${item.name}».`);
+      },
     });
   }
 
   emptyTrash(): void {
-    if (!confirm('Очистить всю корзину? Это действие необратимо.')) return;
+    this.pendingDelete.set({ type: 'empty' });
+  }
+
+  private doEmptyTrash(): void {
+    this.deleteLoading.set(true);
     this.filesService.emptyTrash().pipe(
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: () => {
+        this.pendingDelete.set(null);
+        this.deleteLoading.set(false);
         this.blobs.set([]);
         this.folders.set([]);
         this.actionMessage.set('Корзина очищена.');
         this.errorMessage.set('');
         this.usageSvc.refresh();
       },
-      error: () => this.errorMessage.set('Не удалось очистить корзину.'),
+      error: () => {
+        this.pendingDelete.set(null);
+        this.deleteLoading.set(false);
+        this.errorMessage.set('Не удалось очистить корзину.');
+      },
     });
+  }
+
+  confirmDelete(): void {
+    const p = this.pendingDelete();
+    if (!p) return;
+    if (p.type === 'blob')   this.doHardDeleteBlob(p.item);
+    if (p.type === 'folder') this.doHardDeleteFolder(p.item);
+    if (p.type === 'empty')  this.doEmptyTrash();
+  }
+
+  cancelDelete(): void {
+    this.pendingDelete.set(null);
+  }
+
+  confirmModalTitle(): string {
+    const p = this.pendingDelete();
+    if (!p) return '';
+    if (p.type === 'empty') return 'Очистить корзину?';
+    const name = p.type === 'blob' ? p.item.file_name : p.item.name;
+    return `Удалить «${name}»?`;
+  }
+
+  confirmModalBody(): string {
+    const p = this.pendingDelete();
+    if (!p) return '';
+    if (p.type === 'empty') return 'Все файлы и папки будут удалены безвозвратно. Это действие нельзя отменить.';
+    return 'Файл будет удалён безвозвратно. Это действие нельзя отменить.';
+  }
+
+  confirmModalLabel(): string {
+    const p = this.pendingDelete();
+    if (p?.type === 'empty') return 'Очистить корзину';
+    return 'Удалить';
   }
 
   private animateOut(id: string, after: () => void): void {

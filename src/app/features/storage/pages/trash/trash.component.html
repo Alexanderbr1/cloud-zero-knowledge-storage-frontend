@@ -186,3 +186,14 @@
   </div>
 
 </div>
+
+@if (pendingDelete()) {
+  <app-confirm-modal
+    [title]="confirmModalTitle()"
+    [body]="confirmModalBody()"
+    [confirmLabel]="confirmModalLabel()"
+    [loading]="deleteLoading()"
+    (confirmed)="confirmDelete()"
+    (cancelled)="cancelDelete()"
+  />
+}
