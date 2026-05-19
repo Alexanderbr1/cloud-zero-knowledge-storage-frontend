@@ -17,6 +17,7 @@ import { FilesService } from '../../services/files.service';
 import { FavoritesService } from '../../../favorites/services/favorites.service';
 import { shortMimeType } from '../../../../core/utils/browser.utils';
 import { InputModalComponent } from '../../../../shared/components/input-modal/input-modal.component';
+import { FolderPickerComponent } from '../../../../shared/components/folder-picker/folder-picker.component';
 
 interface SearchResults {
   blobs: FileItem[];
@@ -25,7 +26,7 @@ interface SearchResults {
 
 @Component({
     selector: 'app-files',
-    imports: [DatePipe, InputModalComponent],
+    imports: [DatePipe, InputModalComponent, FolderPickerComponent],
     templateUrl: './files.component.html',
     styleUrl: './files.component.scss'
 })
@@ -140,6 +141,10 @@ export class FilesComponent implements OnInit {
   readonly newFolderName       = signal('');
   readonly creatingFolderError = signal('');
 
+  // ─── Move dialog ──────────────────────────────────────────────────────────
+
+  readonly moveTarget = signal<{ type: 'file' | 'folder'; id: string; name: string } | null>(null);
+
   // ─── Rename modal ─────────────────────────────────────────────────────────
 
   readonly renameTarget     = signal<{ type: 'file' | 'folder'; id: string; name: string } | null>(null);
@@ -239,6 +244,7 @@ export class FilesComponent implements OnInit {
   @HostListener('document:keydown.escape')
   onEscape(): void {
     if (this.openMenuId())        { this.closeMenu(); return; }
+    if (this.moveTarget())        { this.moveTarget.set(null); return; }
     if (this.accessFile())        { this.closeAccessDialog(); return; }
     if (this.renameTarget())      { this.closeRenameModal(); return; }
     if (this.isCreatingFolder())  { this.cancelCreateFolder(); }
@@ -449,7 +455,24 @@ export class FilesComponent implements OnInit {
     }
   }
 
-  private moveBlobToFolder(blobId: string, targetFolderId: string): void {
+  openMoveDialog(item: { type: 'file' | 'folder'; id: string; name: string }, event: Event): void {
+    event.stopPropagation();
+    this.closeMenu();
+    this.moveTarget.set(item);
+  }
+
+  onMovePicked(folderId: string | null): void {
+    const target = this.moveTarget();
+    if (!target) return;
+    this.moveTarget.set(null);
+    if (target.type === 'file') {
+      this.moveBlobToFolder(target.id, folderId);
+    } else {
+      this.moveFolderIntoFolder(target.id, folderId);
+    }
+  }
+
+  private moveBlobToFolder(blobId: string, targetFolderId: string | null): void {
     const sourceFolderId = this.currentFolderId();
     const file = this.files().find(f => f.blob_id === blobId);
     if (!file) return;
@@ -473,7 +496,7 @@ export class FilesComponent implements OnInit {
     });
   }
 
-  private moveFolderIntoFolder(srcFolderId: string, targetFolderId: string): void {
+  private moveFolderIntoFolder(srcFolderId: string, targetFolderId: string | null): void {
     const sourceFolderId = this.currentFolderId();
     const folder = this.folders().find(f => f.folder_id === srcFolderId);
     if (!folder) return;
