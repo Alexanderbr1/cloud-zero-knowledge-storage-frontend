@@ -14,13 +14,10 @@ import { CryptoService } from './crypto.service';
 import { SrpService } from './srp.service';
 
 const LS_EMAIL           = 'auth.email';
-const LS_CRYPTO_SALT     = 'auth.crypto_salt';
 const LS_UNLOCK_CHECK    = 'auth.unlock_check';
 const LS_EC_PRIVATE_KEY  = 'auth.ec_private_key'; // two-level wrapped EC private key blob
 /** Флаг: сессия когда-либо существовала → refresh-кука может быть жива. */
 const LS_SESSION_EXISTED = 'auth.session_existed';
-/** Ключи, которые больше не используются — чистим при старте. */
-const LEGACY_KEYS = ['auth.refresh_token', 'auth.access_token'];
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -44,9 +41,7 @@ export class AuthService {
    */
   private readonly ecPrivateKeySig = signal<CryptoKey | null>(null);
 
-  constructor() {
-    this.lsRemove(...LEGACY_KEYS);
-  }
+  constructor() {}
 
   readonly isAuthenticated = computed(() => !!this.accessTokenSig());
   readonly isUnlocked = computed(() => !!this.masterKeySig());
@@ -73,18 +68,18 @@ export class AuthService {
   }
 
   async unlockSession(password: string): Promise<void> {
-    const saltB64 = this.lsRead(LS_CRYPTO_SALT);
-    if (!saltB64) {
-      throw new Error('Сессия устарела. Войдите снова.');
-    }
-    const saltBytes = new Uint8Array(this.crypto.fromBase64(saltB64));
+    const { crypto_salt } = await firstValueFrom(
+      this.http.get<{ crypto_salt: string }>(`${this.baseUrl}/crypto-salt`)
+    );
+    const saltBytes = new Uint8Array(this.crypto.fromBase64(crypto_salt));
     const key = await this.crypto.deriveMasterKey(password, saltBytes);
     const unlockCheck = this.lsRead(LS_UNLOCK_CHECK);
-    if (unlockCheck) {
-      const valid = await this.crypto.verifyUnlockCheck(unlockCheck, key);
-      if (!valid) {
-        throw new Error('Неверный пароль.');
-      }
+    if (!unlockCheck) {
+      throw new Error('Данные сессии повреждены. Войдите снова.');
+    }
+    const valid = await this.crypto.verifyUnlockCheck(unlockCheck, key);
+    if (!valid) {
+      throw new Error('Неверный пароль.');
     }
     this.masterKeySig.set(key);
     await this.loadECPrivateKey(key);
@@ -134,7 +129,7 @@ export class AuthService {
         take(1),
         finalize(() => {
           this.clearAccess();
-          this.lsRemove(LS_EMAIL, LS_CRYPTO_SALT, LS_UNLOCK_CHECK, LS_EC_PRIVATE_KEY, LS_SESSION_EXISTED);
+          this.lsRemove(LS_EMAIL, LS_UNLOCK_CHECK, LS_EC_PRIVATE_KEY, LS_SESSION_EXISTED);
           this.emailSig.set(null);
         })
       )
@@ -203,7 +198,6 @@ export class AuthService {
     );
 
     const unlockCheck = await this.crypto.createUnlockCheck(masterKey);
-    this.lsWrite(LS_CRYPTO_SALT, this.crypto.toBase64(cryptoSalt));
     this.lsWrite(LS_UNLOCK_CHECK, unlockCheck);
     this.lsWrite(LS_EC_PRIVATE_KEY, encryptedPrivateKeyB64);
     this.masterKeySig.set(masterKey);
@@ -256,7 +250,6 @@ export class AuthService {
     const masterKey = await this.crypto.deriveMasterKey(password, cryptoSaltBytes);
 
     const unlockCheck = await this.crypto.createUnlockCheck(masterKey);
-    this.lsWrite(LS_CRYPTO_SALT, initResp.crypto_salt);
     this.lsWrite(LS_UNLOCK_CHECK, unlockCheck);
     if (finalResp.encrypted_private_key) {
       this.lsWrite(LS_EC_PRIVATE_KEY, finalResp.encrypted_private_key);
