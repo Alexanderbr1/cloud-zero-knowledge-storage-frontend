@@ -68,15 +68,48 @@
           type="password"
           [attr.autocomplete]="mode() === 'register' ? 'new-password' : 'current-password'"
           formControlName="password"
-          [placeholder]="mode() === 'register' ? 'Минимум 8 символов' : 'Ваш пароль'"
+          [placeholder]="mode() === 'register' ? 'Придумайте надёжный пароль' : 'Ваш пароль'"
           enterkeyhint="go"
         />
         @if (passwordControl().touched && passwordControl().hasError('required')) {
           <span class="field-error">Введите пароль</span>
-        } @else if (passwordControl().touched && passwordControl().hasError('minlength')) {
-          <span class="field-error">Минимум 8 символов</span>
-        } @else if (passwordControl().touched && passwordControl().hasError('pattern')) {
-          <span class="field-error">Пароль должен содержать буквы и цифры</span>
+        }
+
+        @if (mode() === 'register') {
+          <div class="pw-meter"
+            [class.pw-meter--weak]="strengthLevel() === 1"
+            [class.pw-meter--fair]="strengthLevel() === 2"
+            [class.pw-meter--good]="strengthLevel() === 3"
+            [class.pw-meter--strong]="strengthLevel() === 4">
+
+            <div class="pw-bar-row">
+              <div class="pw-bar">
+                @for (seg of strengthSegs; track seg) {
+                  <div class="pw-bar__seg" [class.pw-bar__seg--on]="seg < strengthLevel()"></div>
+                }
+              </div>
+              @if (strengthLevel() > 0) {
+                <span class="pw-label">{{ strengthLabel() }}</span>
+              }
+            </div>
+
+            <ul class="pw-reqs">
+              @for (req of strengthReqs(); track req.label) {
+                <li class="pw-req" [class.pw-req--met]="req.met">
+                  <svg class="pw-req__icon" width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    @if (req.met) {
+                      <path d="M2 6.5 4.5 9 10 3" stroke="currentColor" stroke-width="1.6"
+                            stroke-linecap="round" stroke-linejoin="round"/>
+                    } @else {
+                      <circle cx="6" cy="6" r="4.2" stroke="currentColor" stroke-width="1.3"/>
+                    }
+                  </svg>
+                  {{ req.label }}
+                </li>
+              }
+            </ul>
+
+          </div>
         }
       </div>
 
@@ -95,7 +128,13 @@
       </button>
     </form>
 
-    <p class="auth-hint">Используя сервис, вы принимаете условия (демо).</p>
+    @if (mode() === 'login') {
+      <p class="auth-hint">
+        <a routerLink="/auth/forgot-password" class="auth-link">Забыли пароль?</a>
+      </p>
+    } @else {
+      <p class="auth-hint">Используя сервис, вы принимаете условия (демо).</p>
+    }
   </div>
 
 </div>

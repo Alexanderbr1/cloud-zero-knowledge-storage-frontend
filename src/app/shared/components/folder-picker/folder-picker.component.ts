@@ -54,7 +54,7 @@ export class FolderPickerComponent implements OnInit {
 
   navigateTo(index: number): void {
     const crumbs = this.breadcrumbs();
-    this.currentFolderId.set(crumbs[index].folder_id);
+    this.currentFolderId.set(crumbs[index]?.folder_id ?? null);
     this.breadcrumbs.set(crumbs.slice(0, index + 1));
     this.loadFolders();
   }

@@ -82,7 +82,7 @@ function resolveIconType(type: string): IconType {
 export class ActivityComponent implements OnInit {
   private readonly auditService = inject(AuditService);
 
-  readonly events = signal<AuditEvent[]>([]);
+  readonly events = signal<readonly AuditEvent[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly loadingMore = signal(false);

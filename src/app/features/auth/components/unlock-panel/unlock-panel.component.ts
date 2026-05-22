@@ -8,12 +8,12 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
     styleUrl: './unlock-panel.component.scss'
 })
 export class UnlockPanelComponent {
-  email = input.required<string>();
-  isSubmitting = input.required<boolean>();
-  errorText = input<string>('');
+  readonly email = input.required<string>();
+  readonly isSubmitting = input.required<boolean>();
+  readonly errorText = input<string>('');
 
-  submitted = output<string>();
-  logoutRequested = output<void>();
+  readonly submitted = output<string>();
+  readonly logoutRequested = output<void>();
 
   readonly form = new FormGroup({
     password: new FormControl('', { nonNullable: true, validators: [Validators.required] }),

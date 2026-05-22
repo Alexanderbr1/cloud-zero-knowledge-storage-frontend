@@ -1,13 +1,13 @@
 export interface AuditEvent {
-  id: string;
-  event_type: string;
-  ip_address: string;
-  device_name: string;
-  resource_id?: string;
-  resource_name?: string;
-  created_at: string;
+  readonly id: string;
+  readonly event_type: string;
+  readonly ip_address: string;
+  readonly device_name: string;
+  readonly resource_id?: string;
+  readonly resource_name?: string;
+  readonly created_at: string;
 }
 
 export interface ListAuditResponse {
-  events: AuditEvent[];
+  readonly events: readonly AuditEvent[];
 }

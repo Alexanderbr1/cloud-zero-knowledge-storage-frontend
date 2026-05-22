@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { BIP39_WORDLIST } from './bip39-wordlist';
 
 /**
  * CryptoService — всё шифрование на стороне клиента.
@@ -42,8 +43,8 @@ export class CryptoService {
   toBase64(source: ArrayBuffer | Uint8Array): string {
     const bytes = source instanceof Uint8Array ? source : new Uint8Array(source);
     let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
+    for (const byte of bytes) {
+      binary += String.fromCharCode(byte);
     }
     return btoa(binary);
   }
@@ -101,6 +102,79 @@ export class CryptoService {
       false, // non-extractable — ключ не покидает память
       ['wrapKey', 'unwrapKey']
     );
+  }
+
+  // ─── KEK (Key Encryption Key) ────────────────────────────────────────────
+
+  async generateKEK(): Promise<CryptoKey> {
+    const subtle = this.requireSubtle();
+    return subtle.generateKey({ name: 'AES-KW', length: 256 }, true, ['wrapKey', 'unwrapKey']);
+  }
+
+  async wrapKEK(kek: CryptoKey, wrappingKey: CryptoKey): Promise<string> {
+    const subtle = this.requireSubtle();
+    const wrapped = await subtle.wrapKey('raw', kek, wrappingKey, 'AES-KW');
+    return this.toBase64(wrapped);
+  }
+
+  async unwrapKEK(wrappedB64: string, wrappingKey: CryptoKey): Promise<CryptoKey> {
+    const subtle = this.requireSubtle();
+    return subtle.unwrapKey(
+      'raw', this.fromBase64(wrappedB64), wrappingKey, 'AES-KW',
+      { name: 'AES-KW', length: 256 }, true, ['wrapKey', 'unwrapKey'],
+    );
+  }
+
+  // ─── Recovery phrase ─────────────────────────────────────────────────────
+
+  generateRecoveryPhrase(): string {
+    const indices = new Uint16Array(12);
+    globalThis.crypto.getRandomValues(indices);
+    return Array.from(indices).map(n => BIP39_WORDLIST[n % 2048]).join(' ');
+  }
+
+  async deriveRecoveryKey(phrase: string, salt: Uint8Array): Promise<CryptoKey> {
+    const subtle = this.requireSubtle();
+    const enc = new TextEncoder();
+    const normalized = phrase.trim().split(/\s+/).join(' ');
+    const passwordKey = await subtle.importKey('raw', enc.encode(normalized), 'PBKDF2', false, ['deriveKey']);
+    const saltBuf = new ArrayBuffer(salt.byteLength);
+    new Uint8Array(saltBuf).set(salt);
+    return subtle.deriveKey(
+      { name: 'PBKDF2', salt: saltBuf, iterations: 310_000, hash: 'SHA-256' },
+      passwordKey,
+      { name: 'AES-KW', length: 256 },
+      false,
+      ['wrapKey', 'unwrapKey'],
+    );
+  }
+
+  // ─── ClientKey blob (password persistence) ───────────────────────────────
+
+  /** Encrypts a UTF-8 string with a raw 32-byte AES-GCM key (base64). Returns base64(IV || ciphertext). */
+  async encryptWithClientKey(plaintext: string, clientKeyB64: string): Promise<string> {
+    const subtle = this.requireSubtle();
+    const keyBytes = this.fromBase64(clientKeyB64);
+    const key = await subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+    const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext));
+    const out = new Uint8Array(12 + ciphertext.byteLength);
+    out.set(iv, 0);
+    out.set(new Uint8Array(ciphertext), 12);
+    return this.toBase64(out);
+  }
+
+  /** Decrypts a base64(IV || ciphertext) blob with a raw 32-byte AES-GCM key (base64). Returns plaintext string. */
+  async decryptWithClientKey(blobB64: string, clientKeyB64: string): Promise<string> {
+    const subtle = this.requireSubtle();
+    const keyBytes = this.fromBase64(clientKeyB64);
+    const key = await subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    const buf = new Uint8Array(this.fromBase64(blobB64));
+    if (buf.length < 29) throw new Error('Invalid client key blob');
+    const iv = buf.slice(0, 12);
+    const ciphertext = buf.slice(12);
+    const plaintext = await subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+    return new TextDecoder().decode(plaintext);
   }
 
   // ─── Файловые ключи ──────────────────────────────────────────────────────
@@ -162,11 +236,11 @@ export class CryptoService {
    * Returns the public key as SPKI base64 and an opaque encrypted blob for the private key.
    *
    * Private key storage format (concatenated bytes, then base64):
-   *   [40 bytes] AES-KW(masterKey, aesKwk)   — wraps the intermediate AES-256 key
+   *   [40 bytes] AES-KW(kek, aesKwk)   — wraps the intermediate AES-256 key
    *   [12 bytes] IV for AES-GCM
    *   [N  bytes] AES-GCM(aesKwk, PKCS8(privateKey)) + 16-byte GCM tag
    */
-  async generateECKeyPair(masterKey: CryptoKey): Promise<{ publicKeyB64: string; encryptedPrivateKeyB64: string }> {
+  async generateECKeyPair(wrappingKey: CryptoKey): Promise<{ publicKeyB64: string; encryptedPrivateKeyB64: string }> {
     const subtle = this.requireSubtle();
 
     const keyPair = await subtle.generateKey(
@@ -178,15 +252,15 @@ export class CryptoService {
     const spki = await subtle.exportKey('spki', keyPair.publicKey);
     const pkcs8 = await subtle.exportKey('pkcs8', keyPair.privateKey);
 
-    const encryptedPrivateKeyB64 = await this.wrapECPrivateKey(new Uint8Array(pkcs8), masterKey);
+    const encryptedPrivateKeyB64 = await this.wrapECPrivateKey(new Uint8Array(pkcs8), wrappingKey);
     return {
       publicKeyB64: this.toBase64(spki),
       encryptedPrivateKeyB64,
     };
   }
 
-  /** Wraps raw PKCS8 bytes using a two-level scheme: AES-GCM(aesKwk) + AES-KW(masterKey). */
-  async wrapECPrivateKey(pkcs8: Uint8Array<ArrayBuffer>, masterKey: CryptoKey): Promise<string> {
+  /** Wraps raw PKCS8 bytes using a two-level scheme: AES-GCM(aesKwk) + AES-KW(wrappingKey). */
+  async wrapECPrivateKey(pkcs8: Uint8Array<ArrayBuffer>, wrappingKey: CryptoKey): Promise<string> {
     const subtle = this.requireSubtle();
 
     // Intermediate AES-256 key (KWK) — encrypts the PKCS8 blob via AES-GCM.
@@ -194,8 +268,8 @@ export class CryptoService {
     const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
     const ciphertext = await subtle.encrypt({ name: 'AES-GCM', iv }, kwk, pkcs8);
 
-    // Wrap the KWK with the master key via AES-KW (40 bytes for AES-256).
-    const wrappedKwk = await subtle.wrapKey('raw', kwk, masterKey, 'AES-KW');
+    // Wrap the KWK with the wrapping key via AES-KW (40 bytes for AES-256).
+    const wrappedKwk = await subtle.wrapKey('raw', kwk, wrappingKey, 'AES-KW');
 
     // Concatenate: wrappedKwk (40) | iv (12) | ciphertext+tag
     const out = new Uint8Array(wrappedKwk.byteLength + 12 + ciphertext.byteLength);
@@ -205,7 +279,7 @@ export class CryptoService {
     return this.toBase64(out);
   }
 
-  async unwrapECPrivateKey(encryptedB64: string, masterKey: CryptoKey): Promise<CryptoKey> {
+  async unwrapECPrivateKey(encryptedB64: string, wrappingKey: CryptoKey): Promise<CryptoKey> {
     const subtle = this.requireSubtle();
     const buf = new Uint8Array(this.fromBase64(encryptedB64));
 
@@ -220,7 +294,7 @@ export class CryptoService {
 
     // Unwrap the intermediate AES-KW key.
     const kwk = await subtle.unwrapKey(
-      'raw', wrappedKwk, masterKey, 'AES-KW',
+      'raw', wrappedKwk, wrappingKey, 'AES-KW',
       { name: 'AES-GCM', length: 256 }, true, ['decrypt'],
     );
 
@@ -345,13 +419,14 @@ export class CryptoService {
    */
   async encryptFile(
     data: ArrayBuffer,
-    fileKey: CryptoKey
+    fileKey: CryptoKey,
+    aad?: Uint8Array,
   ): Promise<{ ciphertext: ArrayBuffer; ivB64: string }> {
     const subtle = this.requireSubtle();
     const iv = globalThis.crypto.getRandomValues(new Uint8Array(12)); // 96 бит (NIST SP 800-38D)
 
     const ciphertext = await subtle.encrypt(
-      { name: 'AES-GCM', iv },
+      { name: 'AES-GCM', iv, ...(aad ? { additionalData: aad } : {}) },
       fileKey,
       data
     );
@@ -362,13 +437,14 @@ export class CryptoService {
   async decryptFile(
     ciphertext: ArrayBuffer,
     fileKey: CryptoKey,
-    ivB64: string
+    ivB64: string,
+    aad?: Uint8Array,
   ): Promise<ArrayBuffer> {
     const subtle = this.requireSubtle();
     const iv = this.fromBase64(ivB64);
 
     return subtle.decrypt(
-      { name: 'AES-GCM', iv },
+      { name: 'AES-GCM', iv, ...(aad ? { additionalData: aad } : {}) },
       fileKey,
       ciphertext
     );

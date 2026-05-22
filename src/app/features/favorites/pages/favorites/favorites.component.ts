@@ -21,8 +21,8 @@ export class FavoritesComponent implements OnInit {
   private readonly toast            = inject(ToastService);
   private readonly destroyRef       = inject(DestroyRef);
 
-  readonly blobs    = signal<FileItem[]>([]);
-  readonly folders  = signal<FolderItem[]>([]);
+  readonly blobs    = signal<readonly FileItem[]>([]);
+  readonly folders  = signal<readonly FolderItem[]>([]);
   readonly loading  = signal(true);
   readonly error    = signal<string | null>(null);
 

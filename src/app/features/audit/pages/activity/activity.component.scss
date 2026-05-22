@@ -1,4 +1,6 @@
-:host { display: block; }
+:host { display: flex; flex-direction: column; flex: 1; }
+
+.page-container { flex: 1; display: flex; flex-direction: column; }
 
 /* ─── Breadcrumb ──────────────────────────────────────────────────────────── */
 .breadcrumb {
@@ -27,9 +29,12 @@
 
 /* ─── Card ────────────────────────────────────────────────────────────────── */
 .activity-card {
+  flex: 1;
   margin-top: 16px;
   padding: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .card-header {
@@ -54,6 +59,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
+  flex: 1;
 }
 
 .event-item {
@@ -194,9 +200,31 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 64px 24px;
+  flex: 1;
+  gap: 10px;
+  padding: 40px 24px;
   text-align: center;
+  animation: fadeIn 0.3s ease both;
+}
+
+.empty-illustration {
+  flex-shrink: 0;
+  color: var(--c-border-strong);
+  margin-bottom: 2px;
+}
+
+.empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text);
+  margin: 0;
+}
+
+.empty-hint {
+  font-size: 13px;
+  margin: 0;
+  max-width: 280px;
+  line-height: 1.5;
 }
 
 .spinner {

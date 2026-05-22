@@ -10,8 +10,8 @@ export class AuditService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/audit`;
 
-  list(limit = 50, before?: string): Observable<AuditEvent[]> {
-    let params = new HttpParams().set('limit', limit.toString());
+  list(limit = 50, before?: string): Observable<readonly AuditEvent[]> {
+    let params = new HttpParams().set('limit', limit);
     if (before) {
       params = params.set('before', before);
     }

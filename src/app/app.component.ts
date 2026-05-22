@@ -1,8 +1,8 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, Validators } from '@angular/forms';
-import { Router, RouterOutlet } from '@angular/router';
-import { finalize } from 'rxjs';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { filter, finalize } from 'rxjs';
 
 import { AuthService } from './core/services/auth.service';
 import { AuthPanelComponent } from './features/auth/components/auth-panel/auth-panel.component';
@@ -12,44 +12,8 @@ import { ToastComponent } from './core/components/toast/toast.component';
 @Component({
     selector: 'app-root',
     imports: [RouterOutlet, AuthPanelComponent, UnlockPanelComponent, ToastComponent],
-    template: `
-    @switch (appState()) {
-      @case ('checking') {
-        <div class="app-loading" aria-label="Загрузка" aria-busy="true"></div>
-      }
-      @case ('login') {
-        <app-auth-panel
-          [credentialsForm]="loginForm"
-          [mode]="authMode()"
-          [isSubmitting]="isSubmitting()"
-          [errorText]="errorMessage()"
-          (modeChange)="setAuthMode($event)"
-          (submitted)="submitAuth()"
-        />
-      }
-      @case ('unlock') {
-        <app-unlock-panel
-          [email]="auth.email() ?? ''"
-          [isSubmitting]="isSubmitting()"
-          [errorText]="errorMessage()"
-          (submitted)="submitUnlock($event)"
-          (logoutRequested)="submitLogout()"
-        />
-      }
-      @case ('app') {
-        <router-outlet />
-      }
-    }
-    <app-toast />
-  `,
-    styles: [`
-    .app-loading {
-      display: flex;
-      min-height: 100vh;
-      min-height: 100dvh;
-      background: var(--c-bg);
-    }
-  `]
+    templateUrl: './app.component.html',
+    styleUrl: './app.component.scss',
 })
 export class AppComponent implements OnInit {
   protected readonly auth = inject(AuthService);
@@ -57,8 +21,15 @@ export class AppComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
 
   private readonly restoring = signal(true);
+  private readonly currentUrl = signal(this.router.url);
 
-  readonly appState = computed<'checking' | 'login' | 'unlock' | 'app'>(() => {
+  private readonly isPublicAuthPage = computed(() => {
+    const url = this.currentUrl();
+    return url.startsWith('/auth/forgot-password') || url.startsWith('/auth/reset-password');
+  });
+
+  readonly appState = computed<'checking' | 'login' | 'unlock' | 'app' | 'public'>(() => {
+    if (this.isPublicAuthPage()) return 'public';
     if (this.auth.isAuthenticated()) {
       return this.auth.isUnlocked() ? 'app' : 'unlock';
     }
@@ -68,16 +39,21 @@ export class AppComponent implements OnInit {
   readonly authMode = signal<'login' | 'register'>('login');
   readonly isSubmitting = signal(false);
   readonly errorMessage = signal('');
+  readonly recoveryPhrase = signal<string | null>(null);
 
   private readonly registerPasswordMinLen = Validators.minLength(8);
   private readonly registerPasswordPattern = Validators.pattern(/^(?=.*[A-Za-z])(?=.*\d).+$/);
 
-  loginForm = this.fb.nonNullable.group({
+  readonly loginForm = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required]],
   });
 
   ngOnInit(): void {
+    this.router.events.pipe(
+      filter(e => e instanceof NavigationEnd),
+    ).subscribe(e => this.currentUrl.set((e as NavigationEnd).urlAfterRedirects));
+
     if (!this.auth.hadSession()) {
       this.restoring.set(false);
       return;
@@ -117,6 +93,10 @@ export class AppComponent implements OnInit {
     req$.pipe(finalize(() => this.isSubmitting.set(false))).subscribe({
       next: () => {
         this.loginForm.controls.password.setValue('');
+        if (this.authMode() === 'register') {
+          const phrase = this.auth.consumeRecoveryPhrase();
+          if (phrase) this.recoveryPhrase.set(phrase);
+        }
         this.router.navigate(['/files']);
       },
       error: (err: unknown) => {
@@ -153,6 +133,10 @@ export class AppComponent implements OnInit {
         );
       },
     );
+  }
+
+  dismissRecovery(): void {
+    this.recoveryPhrase.set(null);
   }
 
   submitLogout(): void {

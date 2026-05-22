@@ -270,6 +270,7 @@ export class FilesComponent implements OnInit {
   navigateToBreadcrumb(index: number): void {
     const crumbs = this.breadcrumbs();
     const crumb  = crumbs[index];
+    if (!crumb) return;
     this.clearSearch();
     this.currentFolderId.set(crumb.folder_id);
     this.breadcrumbs.set(crumbs.slice(0, index + 1));

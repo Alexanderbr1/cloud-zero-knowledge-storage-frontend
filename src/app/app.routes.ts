@@ -7,6 +7,16 @@ export const routes: Routes = [
     pathMatch: 'full',
   },
   {
+    path: 'auth/forgot-password',
+    loadComponent: () =>
+      import('./features/auth/pages/forgot-password/forgot-password.component').then(m => m.ForgotPasswordComponent),
+  },
+  {
+    path: 'auth/reset-password',
+    loadComponent: () =>
+      import('./features/auth/pages/reset-password/reset-password.component').then(m => m.ResetPasswordComponent),
+  },
+  {
     path: '',
     loadComponent: () =>
       import('./layout/layout.component').then(m => m.LayoutComponent),

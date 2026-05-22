@@ -7,8 +7,8 @@ import { FileItem } from '../../storage/models/file-item.model';
 import { FolderItem } from '../../storage/models/folder.model';
 
 export interface FavoritesResponse {
-  blobs:   FileItem[];
-  folders: FolderItem[];
+  readonly blobs: readonly FileItem[];
+  readonly folders: readonly FolderItem[];
 }
 
 @Injectable({ providedIn: 'root' })

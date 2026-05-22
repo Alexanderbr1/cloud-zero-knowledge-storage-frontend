@@ -10,7 +10,7 @@ export class SessionsService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/sessions`;
 
-  list(): Observable<DeviceSession[]> {
+  list(): Observable<readonly DeviceSession[]> {
     return this.http.get<ListSessionsResponse>(this.base).pipe(map(r => r.sessions ?? []));
   }
 

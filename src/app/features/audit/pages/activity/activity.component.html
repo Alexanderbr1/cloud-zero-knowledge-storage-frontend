@@ -55,11 +55,29 @@
       </div>
     } @else if (events().length === 0) {
       <div class="state-empty">
-        <p class="text-secondary">Нет записей об активности</p>
+        <div class="empty-illustration" aria-hidden="true">
+          <svg width="72" height="72" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="var(--c-border-strong)" stroke-width="1.2"/>
+            <path d="M12 7v5l3 3" stroke="var(--c-border-strong)" stroke-width="1.3"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <p class="empty-title">Нет записей об активности</p>
+        <p class="empty-hint text-muted">Здесь будут отображаться все действия в вашем аккаунте</p>
       </div>
     } @else if (filteredEvents().length === 0) {
       <div class="state-empty">
-        <p class="text-secondary">Ничего не найдено</p>
+        <div class="empty-illustration" aria-hidden="true">
+          <svg width="72" height="72" viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="7" stroke="var(--c-border-strong)" stroke-width="1.2"/>
+            <path d="M16.5 16.5L21 21" stroke="var(--c-border-strong)" stroke-width="1.3"
+                  stroke-linecap="round"/>
+            <path d="M8.5 11h5" stroke="var(--c-border-strong)" stroke-width="1.3"
+                  stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p class="empty-title">Ничего не найдено</p>
+        <p class="empty-hint text-muted">Попробуйте изменить запрос или сбросить фильтры</p>
         <button type="button" class="btn btn--secondary" (click)="clearFilters()">Сбросить фильтры</button>
       </div>
     } @else {

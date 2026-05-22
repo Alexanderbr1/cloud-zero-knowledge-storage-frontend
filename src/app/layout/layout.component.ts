@@ -32,7 +32,7 @@ export class LayoutComponent implements OnInit {
 
   readonly userInitial = computed(() => {
     const email = this.auth.email();
-    return email ? email[0].toUpperCase() : '?';
+    return email ? email.charAt(0).toUpperCase() : '?';
   });
 
   readonly userEmail = computed(() => this.auth.email() ?? '');

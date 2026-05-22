@@ -71,13 +71,14 @@ export class SharedWithMeComponent implements OnInit {
   }
 
   private async fetchAndSave(
-    result: { downloadUrl: string; fileKey: CryptoKey; fileIVb64: string; fileName: string },
+    result: { downloadUrl: string; fileKey: CryptoKey; fileIVb64: string; fileName: string; ownerUserId: string },
     contentType: string,
   ): Promise<void> {
     const resp = await fetch(result.downloadUrl);
     if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
     const encrypted = await resp.arrayBuffer();
-    const plaintext = await this.crypto.decryptFile(encrypted, result.fileKey, result.fileIVb64);
+    const aad = result.ownerUserId ? new TextEncoder().encode(result.ownerUserId) : undefined;
+    const plaintext = await this.crypto.decryptFile(encrypted, result.fileKey, result.fileIVb64, aad);
     triggerBrowserDownload(plaintext, result.fileName, contentType);
   }
 }

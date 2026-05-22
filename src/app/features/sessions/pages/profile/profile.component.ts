@@ -17,7 +17,7 @@ export class ProfileComponent {
   readonly email = computed(() => this.auth.email() ?? '—');
   readonly userInitial = computed(() => {
     const e = this.auth.email();
-    return e ? e[0].toUpperCase() : '?';
+    return e ? e.charAt(0).toUpperCase() : '?';
   });
 
   logout(): void {

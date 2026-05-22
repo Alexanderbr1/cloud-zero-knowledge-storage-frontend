@@ -4,8 +4,8 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 
 export interface StorageUsage {
-  used_bytes:  number;
-  quota_bytes: number;
+  readonly used_bytes: number;
+  readonly quota_bytes: number;
 }
 
 @Injectable({ providedIn: 'root' })

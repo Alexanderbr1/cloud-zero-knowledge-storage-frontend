@@ -674,7 +674,7 @@
             @for (share of fileShares(); track share.share_id) {
               <li class="share-row">
                 <div class="share-avatar" aria-hidden="true">
-                  {{ (share.recipient_email ?? '?')[0].toUpperCase() }}
+                  {{ (share.recipient_email ?? '?').charAt(0).toUpperCase() }}
                 </div>
                 <div class="share-info">
                   <span class="share-email">{{ share.recipient_email ?? '—' }}</span>

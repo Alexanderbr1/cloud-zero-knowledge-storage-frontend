@@ -16,7 +16,7 @@ export class SessionsComponent implements OnInit {
   private readonly sessionsService = inject(SessionsService);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly sessions = signal<DeviceSession[]>([]);
+  readonly sessions = signal<readonly DeviceSession[]>([]);
   readonly isLoading = signal(false);
   readonly revoking = signal<string | null>(null);
   readonly errorMessage = signal('');

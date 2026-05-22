@@ -192,7 +192,7 @@ export class SrpService {
       this.sha256(this.hexToBytes(this.N_HEX)),
       this.sha256(this.pad(this.G)),
     ]);
-    return hN.map((b, i) => b ^ hG[i]);
+    return hN.map((b, i) => b ^ (hG[i] ?? 0));
   }
 
   /** k = SHA-256(pad(N) || pad(g))  — SRP-6a multiplier. */

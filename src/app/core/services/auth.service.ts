@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, finalize, firstValueFrom, from, map, of, take, tap, throwError } from 'rxjs';
+import { Observable, catchError, finalize, firstValueFrom, from, map, of, switchMap, take, tap, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import type {
@@ -16,6 +16,7 @@ import { SrpService } from './srp.service';
 const LS_EMAIL           = 'auth.email';
 const LS_UNLOCK_CHECK    = 'auth.unlock_check';
 const LS_EC_PRIVATE_KEY  = 'auth.ec_private_key'; // two-level wrapped EC private key blob
+const LS_CK_BLOB         = 'auth.ck_blob';         // AES-GCM(clientKey, password) — for key persistence across page loads
 /** Флаг: сессия когда-либо существовала → refresh-кука может быть жива. */
 const LS_SESSION_EXISTED = 'auth.session_existed';
 
@@ -33,6 +34,8 @@ export class AuthService {
    * Производится из пароля через PBKDF2. Обнуляется при logout.
    */
   private readonly masterKeySig = signal<CryptoKey | null>(null);
+  private readonly kekSig = signal<CryptoKey | null>(null);
+  private readonly userIdSig = signal<string | null>(null);
 
   /**
    * EC private key (P-256) — lives only in memory.
@@ -40,8 +43,6 @@ export class AuthService {
    * Used for ECIES file sharing. Null for legacy accounts without EC keys.
    */
   private readonly ecPrivateKeySig = signal<CryptoKey | null>(null);
-
-  constructor() {}
 
   readonly isAuthenticated = computed(() => !!this.accessTokenSig());
   readonly isUnlocked = computed(() => !!this.masterKeySig());
@@ -51,8 +52,20 @@ export class AuthService {
     return this.accessTokenSig();
   }
 
+  userId(): string | null {
+    return this.userIdSig();
+  }
+
   getMasterKey(): CryptoKey | null {
     return this.masterKeySig();
+  }
+
+  getKEK(): CryptoKey | null {
+    return this.kekSig();
+  }
+
+  getFileKey(): CryptoKey | null {
+    return this.kekSig() ?? this.masterKeySig();
   }
 
   getECPrivateKey(): CryptoKey | null {
@@ -62,16 +75,17 @@ export class AuthService {
   tryRestoreSession(): Observable<boolean> {
     return this.http.post<TokenResponseDto>(`${this.baseUrl}/refresh`, {}).pipe(
       tap((t) => this.setAccessToken(t.access_token)),
+      switchMap((t) => from(this.tryRestoreKeysFromClientKey(t))),
       map(() => true),
       catchError(() => of(false)),
     );
   }
 
   async unlockSession(password: string): Promise<void> {
-    const { crypto_salt } = await firstValueFrom(
-      this.http.get<{ crypto_salt: string }>(`${this.baseUrl}/crypto-salt`)
+    const resp = await firstValueFrom(
+      this.http.get<{ crypto_salt: string; kek_encrypted_master?: string }>(`${this.baseUrl}/crypto-salt`)
     );
-    const saltBytes = new Uint8Array(this.crypto.fromBase64(crypto_salt));
+    const saltBytes = new Uint8Array(this.crypto.fromBase64(resp.crypto_salt));
     const key = await this.crypto.deriveMasterKey(password, saltBytes);
     const unlockCheck = this.lsRead(LS_UNLOCK_CHECK);
     if (!unlockCheck) {
@@ -82,7 +96,21 @@ export class AuthService {
       throw new Error('Неверный пароль.');
     }
     this.masterKeySig.set(key);
-    await this.loadECPrivateKey(key);
+    if (resp.kek_encrypted_master) {
+      await this.loadKEK(resp.kek_encrypted_master, key);
+    }
+    await this.loadECPrivateKey();
+    // Refresh to obtain a fresh ClientKey and persist the password blob so the
+    // unlock screen is skipped on the next page load.
+    try {
+      const tokenResp = await firstValueFrom(
+        this.http.post<TokenResponseDto>(`${this.baseUrl}/refresh`, {})
+      );
+      this.setAccessToken(tokenResp.access_token);
+      if (tokenResp.client_key) {
+        await this.savePasswordBlob(password, tokenResp.client_key);
+      }
+    } catch { /* non-critical — keys are already in memory */ }
   }
 
   /**
@@ -129,7 +157,7 @@ export class AuthService {
         take(1),
         finalize(() => {
           this.clearAccess();
-          this.lsRemove(LS_EMAIL, LS_UNLOCK_CHECK, LS_EC_PRIVATE_KEY, LS_SESSION_EXISTED);
+          this.lsRemove(LS_EMAIL, LS_UNLOCK_CHECK, LS_EC_PRIVATE_KEY, LS_CK_BLOB, LS_SESSION_EXISTED);
           this.emailSig.set(null);
         })
       )
@@ -139,7 +167,9 @@ export class AuthService {
   clearAccess(): void {
     this.accessTokenSig.set(null);
     this.masterKeySig.set(null);
+    this.kekSig.set(null);
     this.ecPrivateKeySig.set(null);
+    this.userIdSig.set(null);
   }
 
   private lsRead(key: string): string | null {
@@ -161,19 +191,28 @@ export class AuthService {
     this.emailSig.set(email);
   }
 
-  /** Loads and unwraps the EC private key from localStorage. Silent on failure (legacy accounts). */
-  private async loadECPrivateKey(masterKey: CryptoKey): Promise<void> {
+  /** Loads and unwraps the EC private key from localStorage using KEK. Silent on failure. */
+  private async loadECPrivateKey(): Promise<void> {
     const encB64 = this.lsRead(LS_EC_PRIVATE_KEY);
     if (!encB64) return;
+    const kek = this.kekSig();
+    if (!kek) return;
     try {
-      const privateKey = await this.crypto.unwrapECPrivateKey(encB64, masterKey);
+      const privateKey = await this.crypto.unwrapECPrivateKey(encB64, kek);
       this.ecPrivateKeySig.set(privateKey);
-    } catch {
-      // Stale or corrupted blob — silently ignore; sharing will be unavailable.
-    }
+    } catch { /* stale or corrupted blob — sharing unavailable */ }
   }
 
   // ─── Приватные методы ──────────────────────────────────────────────────
+
+  private _pendingRecoveryPhrase: string | null = null;
+
+  /** One-time access to the recovery phrase generated during registration. Cleared after first read. */
+  consumeRecoveryPhrase(): string | null {
+    const phrase = this._pendingRecoveryPhrase;
+    this._pendingRecoveryPhrase = null;
+    return phrase;
+  }
 
   private async _registerFlow(email: string, password: string): Promise<void> {
     const { srpSalt, srpVerifier, bcryptSalt } = await this.srp.createVerifier(password);
@@ -181,7 +220,15 @@ export class AuthService {
     const cryptoSalt = this.crypto.generateSalt();
     const masterKey = await this.crypto.deriveMasterKey(password, cryptoSalt);
 
-    const { publicKeyB64, encryptedPrivateKeyB64 } = await this.crypto.generateECKeyPair(masterKey);
+    const recoveryPhrase = this.crypto.generateRecoveryPhrase();
+    const recoverySalt = this.crypto.generateSalt();
+    const recoveryKey = await this.crypto.deriveRecoveryKey(recoveryPhrase, recoverySalt);
+    const kek = await this.crypto.generateKEK();
+    const kekEncryptedMaster = await this.crypto.wrapKEK(kek, masterKey);
+    const kekEncryptedRecovery = await this.crypto.wrapKEK(kek, recoveryKey);
+
+    // EC private key is wrapped by KEK (not masterKey) so it survives password resets.
+    const { publicKeyB64, encryptedPrivateKeyB64 } = await this.crypto.generateECKeyPair(kek);
 
     const payload: RegisterRequestDto = {
       email,
@@ -191,6 +238,9 @@ export class AuthService {
       crypto_salt: this.crypto.toBase64(cryptoSalt),
       public_key: publicKeyB64,
       encrypted_private_key: encryptedPrivateKeyB64,
+      kek_encrypted_master: kekEncryptedMaster,
+      kek_encrypted_recovery: kekEncryptedRecovery,
+      recovery_salt: this.crypto.toBase64(recoverySalt),
     };
 
     const resp = await firstValueFrom(
@@ -201,12 +251,17 @@ export class AuthService {
     this.lsWrite(LS_UNLOCK_CHECK, unlockCheck);
     this.lsWrite(LS_EC_PRIVATE_KEY, encryptedPrivateKeyB64);
     this.masterKeySig.set(masterKey);
+    this.kekSig.set(kek);
+    this._pendingRecoveryPhrase = recoveryPhrase;
     try {
-      const ecPrivKey = await this.crypto.unwrapECPrivateKey(encryptedPrivateKeyB64, masterKey);
+      const ecPrivKey = await this.crypto.unwrapECPrivateKey(encryptedPrivateKeyB64, kek);
       this.ecPrivateKeySig.set(ecPrivKey);
     } catch { /* sharing unavailable */ }
     this.setEmail(email);
     this.setAccessToken(resp.access_token);
+    if (resp.client_key) {
+      await this.savePasswordBlob(password, resp.client_key);
+    }
   }
 
   private async _loginFlow(email: string, password: string): Promise<void> {
@@ -256,9 +311,97 @@ export class AuthService {
     }
 
     this.masterKeySig.set(masterKey);
-    await this.loadECPrivateKey(masterKey);
+    if (finalResp.kek_encrypted_master) {
+      await this.loadKEK(finalResp.kek_encrypted_master, masterKey);
+    }
+    await this.loadECPrivateKey();
     this.setEmail(normalizedEmail);
     this.setAccessToken(finalResp.access_token);
+    if (finalResp.client_key) {
+      await this.savePasswordBlob(password, finalResp.client_key);
+    }
+  }
+
+  requestPasswordReset(email: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/reset-password/request`, { email }).pipe(map(() => void 0));
+  }
+
+  resetPassword(token: string, recoveryPhrase: string, newPassword: string): Observable<void> {
+    return from(this._resetPasswordFlow(token, recoveryPhrase, newPassword));
+  }
+
+  private async _resetPasswordFlow(token: string, recoveryPhrase: string, newPassword: string): Promise<void> {
+    // Token is in the POST body — never exposed in URL query params or server access logs.
+    const recoveryData = await firstValueFrom(
+      this.http.post<{ kek_encrypted_recovery: string; recovery_salt: string }>(
+        `${this.baseUrl}/reset-password/recovery-data`, { token }
+      )
+    );
+
+    const recoverySaltBytes = new Uint8Array(this.crypto.fromBase64(recoveryData.recovery_salt));
+    const recoveryKey = await this.crypto.deriveRecoveryKey(recoveryPhrase, recoverySaltBytes);
+    const kek = await this.crypto.unwrapKEK(recoveryData.kek_encrypted_recovery, recoveryKey);
+
+    const { srpSalt, srpVerifier, bcryptSalt } = await this.srp.createVerifier(newPassword);
+    const newCryptoSalt = this.crypto.generateSalt();
+    const newMasterKey = await this.crypto.deriveMasterKey(newPassword, newCryptoSalt);
+    const newKEKEncryptedMaster = await this.crypto.wrapKEK(kek, newMasterKey);
+
+    await firstValueFrom(
+      this.http.post<void>(`${this.baseUrl}/reset-password/confirm`, {
+        token,
+        srp_salt: srpSalt,
+        srp_verifier: srpVerifier,
+        bcrypt_salt: bcryptSalt,
+        crypto_salt: this.crypto.toBase64(newCryptoSalt),
+        kek_encrypted_master: newKEKEncryptedMaster,
+      })
+    );
+  }
+
+  private async savePasswordBlob(password: string, clientKeyB64: string): Promise<void> {
+    try {
+      const blob = await this.crypto.encryptWithClientKey(password, clientKeyB64);
+      this.lsWrite(LS_CK_BLOB, blob);
+    } catch { /* non-critical */ }
+  }
+
+  private async tryRestoreKeysFromClientKey(tokenResp: TokenResponseDto): Promise<void> {
+    if (!tokenResp.client_key) return;
+    const blob = this.lsRead(LS_CK_BLOB);
+    if (!blob) return;
+    try {
+      const password = await this.crypto.decryptWithClientKey(blob, tokenResp.client_key);
+      const cryptoResp = await firstValueFrom(
+        this.http.get<{ crypto_salt: string; kek_encrypted_master?: string }>(`${this.baseUrl}/crypto-salt`)
+      );
+      const saltBytes = new Uint8Array(this.crypto.fromBase64(cryptoResp.crypto_salt));
+      const masterKey = await this.crypto.deriveMasterKey(password, saltBytes);
+      const unlockCheck = this.lsRead(LS_UNLOCK_CHECK);
+      if (unlockCheck && !(await this.crypto.verifyUnlockCheck(unlockCheck, masterKey))) {
+        // Blob is stale (password was changed) — clear it so unlock screen shows.
+        this.lsRemove(LS_CK_BLOB);
+        return;
+      }
+      this.masterKeySig.set(masterKey);
+      if (cryptoResp.kek_encrypted_master) {
+        await this.loadKEK(cryptoResp.kek_encrypted_master, masterKey);
+      }
+      await this.loadECPrivateKey();
+      // Rotate blob with the fresh ClientKey received in this response.
+      await this.savePasswordBlob(password, tokenResp.client_key);
+    } catch {
+      // Silent — unlock screen will appear, user enters password manually.
+    }
+  }
+
+  private async loadKEK(kekEncryptedMasterB64: string, masterKey: CryptoKey): Promise<void> {
+    try {
+      const kek = await this.crypto.unwrapKEK(kekEncryptedMasterB64, masterKey);
+      this.kekSig.set(kek);
+    } catch {
+      // KEK unwrap failed — file operations fall back to master key.
+    }
   }
 
   hadSession(): boolean {
@@ -273,5 +416,13 @@ export class AuthService {
     }
     this.lsWrite(LS_SESSION_EXISTED, '1');
     this.accessTokenSig.set(t);
+    try {
+      const part = t.split('.').at(1);
+      if (!part) throw new Error('malformed token');
+      const payload = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')));
+      this.userIdSig.set(payload.sub ?? null);
+    } catch {
+      this.userIdSig.set(null);
+    }
   }
 }

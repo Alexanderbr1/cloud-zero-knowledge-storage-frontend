@@ -7,18 +7,19 @@ import { AuthService } from './auth.service';
 import { CryptoService } from './crypto.service';
 
 export interface ShareItem {
-  share_id: string;
-  blob_id: string;
-  owner_email: string;
-  recipient_email?: string;
-  file_name: string;
-  content_type: string;
-  ephemeral_pub: string;
-  wrapped_file_key: string;
-  expires_at?: string;
-  created_at: string;
-  download_url?: string;
-  file_iv?: string;
+  readonly share_id: string;
+  readonly blob_id: string;
+  readonly owner_id: string;
+  readonly owner_email: string;
+  readonly recipient_email?: string;
+  readonly file_name: string;
+  readonly content_type: string;
+  readonly ephemeral_pub: string;
+  readonly wrapped_file_key: string;
+  readonly expires_at?: string;
+  readonly created_at: string;
+  readonly download_url?: string;
+  readonly file_iv?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -48,13 +49,16 @@ export class SharingService {
     recipientEmail: string,
     recipientPublicKeyB64: string,
   ): Observable<ShareItem> {
-    const masterKey = this.auth.getMasterKey();
-    if (!masterKey) {
+    const fileWrappingKey = this.auth.getFileKey();
+    const rawMasterKey   = this.auth.getMasterKey();
+    if (!fileWrappingKey || !rawMasterKey) {
       return throwError(() => new Error('Master key unavailable — please unlock your session.'));
     }
 
     const flow = async (): Promise<ShareItem> => {
-      const fileKey = await this.crypto.unwrapFileKeyForSharing(encryptedFileKeyB64, masterKey);
+      // Try KEK (new files) first; fall back to rawMasterKey for files uploaded before KEK was introduced.
+      const fileKey = await this.crypto.unwrapFileKeyForSharing(encryptedFileKeyB64, fileWrappingKey)
+        .catch(() => this.crypto.unwrapFileKeyForSharing(encryptedFileKeyB64, rawMasterKey));
       const { ephemeralPubB64, wrappedFileKeyB64 } = await this.crypto.encryptFileKeyForRecipient(fileKey, recipientPublicKeyB64);
       return firstValueFrom(
         this.http.post<ShareItem>(
@@ -81,7 +85,7 @@ export class SharingService {
    * Get a shared file's download URL and decrypt the file key (recipient side).
    * Returns the download URL and decrypted file key for use with CryptoService.decryptFile.
    */
-  getSharedFile(shareId: string): Observable<{ downloadUrl: string; fileKey: CryptoKey; fileIVb64: string; fileName: string }> {
+  getSharedFile(shareId: string): Observable<{ downloadUrl: string; fileKey: CryptoKey; fileIVb64: string; fileName: string; ownerUserId: string }> {
     const ecPrivateKey = this.auth.getECPrivateKey();
     if (!ecPrivateKey) {
       return throwError(() => new Error('EC private key unavailable — please log in again.'));
@@ -107,6 +111,7 @@ export class SharingService {
         fileKey,
         fileIVb64: share.file_iv,
         fileName: share.file_name,
+        ownerUserId: share.owner_id,
       };
     };
 

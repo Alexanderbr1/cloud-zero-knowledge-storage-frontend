@@ -33,8 +33,8 @@ export class TrashComponent implements OnInit {
   private readonly usageSvc = inject(StorageUsageService);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly blobs = signal<TrashFileItem[]>([]);
-  readonly folders = signal<TrashFolderItem[]>([]);
+  readonly blobs = signal<readonly TrashFileItem[]>([]);
+  readonly folders = signal<readonly TrashFolderItem[]>([]);
   readonly isLoading = signal(false);
   readonly actionMessage = signal('');
   readonly errorMessage = signal('');
