@@ -4,13 +4,6 @@
     <h1 class="page-title">Доступные мне</h1>
   </div>
 
-  @if (actionMessage()) {
-    <div class="alert alert--success" role="status">{{ actionMessage() }}</div>
-  }
-  @if (errorMessage()) {
-    <div class="alert alert--error" role="alert">{{ errorMessage() }}</div>
-  }
-
   <div class="files-card card">
     <div class="table-head">
       <span class="col-name">Имя</span>

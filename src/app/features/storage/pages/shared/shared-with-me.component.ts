@@ -6,6 +6,7 @@ import { finalize, from, switchMap } from 'rxjs';
 import { AuthService } from '../../../../core/services/auth.service';
 import { CryptoService } from '../../../../core/services/crypto.service';
 import { ShareItem, SharingService } from '../../../../core/services/sharing.service';
+import { ToastService } from '../../../../core/services/toast.service';
 import { shortMimeType, triggerBrowserDownload } from '../../../../core/utils/browser.utils';
 
 @Component({
@@ -19,13 +20,12 @@ export class SharedWithMeComponent implements OnInit {
   private readonly sharingService = inject(SharingService);
   private readonly crypto = inject(CryptoService);
   private readonly auth = inject(AuthService);
+  private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly shares = signal<ShareItem[]>([]);
   readonly isLoading = signal(false);
   readonly downloadingId = signal<string | null>(null);
-  readonly actionMessage = signal('');
-  readonly errorMessage = signal('');
 
   ngOnInit(): void {
     this.load();
@@ -33,20 +33,17 @@ export class SharedWithMeComponent implements OnInit {
 
   load(): void {
     this.isLoading.set(true);
-    this.actionMessage.set('');
-    this.errorMessage.set('');
     this.sharingService.listSharedWithMe().pipe(
       finalize(() => this.isLoading.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: resp => this.shares.set(resp.items ?? []),
-      error: () => this.errorMessage.set('Не удалось загрузить список файлов.'),
+      error: () => this.toast.error('Не удалось загрузить список файлов.'),
     });
   }
 
   download(item: ShareItem): void {
     if (this.downloadingId() === item.share_id) return;
-    this.errorMessage.set('');
     this.downloadingId.set(item.share_id);
 
     this.sharingService.getSharedFile(item.share_id).pipe(
@@ -54,14 +51,14 @@ export class SharedWithMeComponent implements OnInit {
       finalize(() => this.downloadingId.set(null)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: () => this.actionMessage.set(`Файл «${item.file_name}» скачан.`),
+      next: () => this.toast.success(`Файл «${item.file_name}» скачан.`),
       error: (err: unknown) => {
         if (err instanceof Error && err.message.startsWith('EC private key')) {
           this.auth.clearAccess();
-          this.errorMessage.set('Сессия истекла — войдите снова.');
+          this.toast.error('Сессия истекла — войдите снова.');
           return;
         }
-        this.errorMessage.set(`Не удалось скачать «${item.file_name}».`);
+        this.toast.error(`Не удалось скачать «${item.file_name}».`);
       },
     });
   }

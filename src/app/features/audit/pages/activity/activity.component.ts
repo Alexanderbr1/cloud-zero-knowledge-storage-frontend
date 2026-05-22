@@ -21,7 +21,7 @@ const EVENT_LABELS: Record<string, string> = {
   file_renamed:            'Файл переименован',
   file_moved:              'Файл перемещён',
   folder_moved:            'Папка перемещена',
-  file_shared:             'Файл поделён',
+  file_shared:             'Открыт доступ к файлу',
   file_share_revoked:      'Доступ к файлу отозван',
   folder_created:          'Папка создана',
   folder_deleted:          'Папка перемещена в корзину',
