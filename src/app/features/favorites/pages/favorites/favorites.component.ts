@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { ToastService } from '../../../../core/services/toast.service';
@@ -14,6 +14,7 @@ import { shortMimeType } from '../../../../core/utils/browser.utils';
   imports: [DatePipe],
   templateUrl: './favorites.component.html',
   styleUrl: './favorites.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FavoritesComponent implements OnInit {
   private readonly favoritesService = inject(FavoritesService);
@@ -33,7 +34,9 @@ export class FavoritesComponent implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set(null);
-    this.favoritesService.list().subscribe({
+    this.favoritesService.list().pipe(
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
       next: ({ blobs, folders }) => {
         this.blobs.set(blobs);
         this.folders.set(folders);

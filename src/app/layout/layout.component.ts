@@ -1,4 +1,4 @@
-import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
@@ -9,7 +9,8 @@ import { StorageUsageService } from '../core/services/storage-usage.service';
     selector: 'app-layout',
     imports: [RouterOutlet, RouterLink, RouterLinkActive, DecimalPipe],
     templateUrl: './layout.component.html',
-    styleUrl: './layout.component.scss'
+    styleUrl: './layout.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LayoutComponent implements OnInit {
   private readonly auth         = inject(AuthService);

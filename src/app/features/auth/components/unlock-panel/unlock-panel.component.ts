@@ -1,11 +1,12 @@
-import { Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
 @Component({
     selector: 'app-unlock-panel',
     imports: [ReactiveFormsModule],
     templateUrl: './unlock-panel.component.html',
-    styleUrl: './unlock-panel.component.scss'
+    styleUrl: './unlock-panel.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class UnlockPanelComponent {
   readonly email = input.required<string>();

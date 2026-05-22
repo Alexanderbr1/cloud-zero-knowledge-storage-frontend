@@ -1,12 +1,15 @@
-import { Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Observable, startWith, switchMap } from 'rxjs';
 
 @Component({
     selector: 'app-auth-panel',
     imports: [ReactiveFormsModule, RouterLink],
     templateUrl: './auth-panel.component.html',
-    styleUrl: './auth-panel.component.scss'
+    styleUrl: './auth-panel.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AuthPanelComponent {
   readonly credentialsForm = input.required<FormGroup>();
@@ -22,20 +25,15 @@ export class AuthPanelComponent {
 
   readonly strengthSegs = [0, 1, 2, 3] as const;
 
-  selectMode(next: 'login' | 'register'): void {
-    this.modeChange.emit(next);
-  }
+  private readonly passwordValue = toSignal(
+    toObservable(this.passwordControl).pipe(
+      switchMap(ctrl => (ctrl.valueChanges as Observable<string>).pipe(startWith(ctrl.value as string ?? '')))
+    ),
+    { initialValue: '' },
+  );
 
-  onSubmit(): void {
-    this.credentialsForm().markAllAsTouched();
-    this.submitted.emit();
-  }
-
-  // ─── Password strength ────────────────────────────────────────────────────
-
-  /** 0–5: one point per satisfied criterion. */
-  passwordStrength(): number {
-    const v = (this.passwordControl().value as string) ?? '';
+  private readonly strengthScore = computed((): number => {
+    const v = this.passwordValue();
     let s = 0;
     if (v.length >= 8)           s++;
     if (/[A-Z]/.test(v))         s++;
@@ -43,26 +41,25 @@ export class AuthPanelComponent {
     if (/[0-9]/.test(v))         s++;
     if (/[^A-Za-z0-9]/.test(v))  s++;
     return s;
-  }
+  });
 
-  /** Maps score to 0–4 display levels: 0 = empty, 1–4 = weak…strong. */
-  strengthLevel(): 0 | 1 | 2 | 3 | 4 {
-    const v = (this.passwordControl().value as string) ?? '';
+  readonly strengthLevel = computed((): 0 | 1 | 2 | 3 | 4 => {
+    const v = this.passwordValue();
     if (!v) return 0;
-    const s = this.passwordStrength();
+    const s = this.strengthScore();
     if (s <= 2) return 1;
     if (s === 3) return 2;
     if (s === 4) return 3;
     return 4;
-  }
+  });
 
-  strengthLabel(): string {
+  readonly strengthLabel = computed((): string => {
     const labels: Record<number, string> = { 1: 'Слабый', 2: 'Средний', 3: 'Хороший', 4: 'Надёжный' };
     return labels[this.strengthLevel()] ?? '';
-  }
+  });
 
-  strengthReqs(): { label: string; met: boolean }[] {
-    const v = (this.passwordControl().value as string) ?? '';
+  readonly strengthReqs = computed((): { label: string; met: boolean }[] => {
+    const v = this.passwordValue();
     return [
       { label: 'Минимум 8 символов',  met: v.length >= 8 },
       { label: 'Заглавная буква',      met: /[A-Z]/.test(v) },
@@ -70,5 +67,14 @@ export class AuthPanelComponent {
       { label: 'Цифра (0–9)',          met: /[0-9]/.test(v) },
       { label: 'Спецсимвол (!@#…)',    met: /[^A-Za-z0-9]/.test(v) },
     ];
+  });
+
+  selectMode(next: 'login' | 'register'): void {
+    this.modeChange.emit(next);
+  }
+
+  onSubmit(): void {
+    this.credentialsForm().markAllAsTouched();
+    this.submitted.emit();
   }
 }

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, Validators } from '@angular/forms';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
@@ -14,6 +14,7 @@ import { ToastComponent } from './core/components/toast/toast.component';
     imports: [RouterOutlet, AuthPanelComponent, UnlockPanelComponent, ToastComponent],
     templateUrl: './app.component.html',
     styleUrl: './app.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent implements OnInit {
   protected readonly auth = inject(AuthService);

@@ -4,6 +4,7 @@ import {
   Component,
   DestroyRef,
   OnInit,
+  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -12,6 +13,7 @@ import { finalize } from 'rxjs';
 
 import { shortMimeType } from '../../../../core/utils/browser.utils';
 import { StorageUsageService } from '../../../../core/services/storage-usage.service';
+import { ToastService } from '../../../../core/services/toast.service';
 import { FilesService } from '../../services/files.service';
 import { TrashFileItem, TrashFolderItem } from '../../models/trash.model';
 import { ConfirmModalComponent } from '../../../../shared/components/confirm-modal/confirm-modal.component';
@@ -31,21 +33,18 @@ type PendingDelete =
 export class TrashComponent implements OnInit {
   private readonly filesService = inject(FilesService);
   private readonly usageSvc = inject(StorageUsageService);
+  private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly blobs = signal<readonly TrashFileItem[]>([]);
   readonly folders = signal<readonly TrashFolderItem[]>([]);
   readonly isLoading = signal(false);
-  readonly actionMessage = signal('');
-  readonly errorMessage = signal('');
   readonly pendingDelete = signal<PendingDelete | null>(null);
   readonly deleteLoading = signal(false);
 
   private readonly fadingOut = signal(new Set<string>());
 
-  get isEmpty(): boolean {
-    return this.blobs().length === 0 && this.folders().length === 0;
-  }
+  readonly isEmpty = computed(() => this.blobs().length === 0 && this.folders().length === 0);
 
   isFading(id: string): boolean {
     return this.fadingOut().has(id);
@@ -61,8 +60,6 @@ export class TrashComponent implements OnInit {
 
   load(): void {
     this.isLoading.set(true);
-    this.actionMessage.set('');
-    this.errorMessage.set('');
     this.filesService.listTrash().pipe(
       finalize(() => this.isLoading.set(false)),
       takeUntilDestroyed(this.destroyRef),
@@ -71,7 +68,7 @@ export class TrashComponent implements OnInit {
         this.blobs.set(r.blobs ?? []);
         this.folders.set(r.folders ?? []);
       },
-      error: () => this.errorMessage.set('Не удалось загрузить корзину.'),
+      error: () => this.toast.error('Не удалось загрузить корзину.'),
     });
   }
 
@@ -81,10 +78,9 @@ export class TrashComponent implements OnInit {
     ).subscribe({
       next: () => this.animateOut(item.blob_id, () => {
         this.blobs.update(list => list.filter(b => b.blob_id !== item.blob_id));
-        this.actionMessage.set(`«${item.file_name}» восстановлен.`);
-        this.errorMessage.set('');
+        this.toast.success(`«${item.file_name}» восстановлен.`);
       }),
-      error: () => this.errorMessage.set(`Не удалось восстановить «${item.file_name}».`),
+      error: () => this.toast.error(`Не удалось восстановить «${item.file_name}».`),
     });
   }
 
@@ -102,15 +98,14 @@ export class TrashComponent implements OnInit {
         this.deleteLoading.set(false);
         this.animateOut(item.blob_id, () => {
           this.blobs.update(list => list.filter(b => b.blob_id !== item.blob_id));
-          this.actionMessage.set(`«${item.file_name}» удалён безвозвратно.`);
-          this.errorMessage.set('');
+          this.toast.success(`«${item.file_name}» удалён безвозвратно.`);
           this.usageSvc.refresh();
         });
       },
       error: () => {
         this.pendingDelete.set(null);
         this.deleteLoading.set(false);
-        this.errorMessage.set(`Не удалось удалить «${item.file_name}».`);
+        this.toast.error(`Не удалось удалить «${item.file_name}».`);
       },
     });
   }
@@ -121,10 +116,9 @@ export class TrashComponent implements OnInit {
     ).subscribe({
       next: () => this.animateOut(item.folder_id, () => {
         this.folders.update(list => list.filter(f => f.folder_id !== item.folder_id));
-        this.actionMessage.set(`«${item.name}» восстановлена.`);
-        this.errorMessage.set('');
+        this.toast.success(`«${item.name}» восстановлена.`);
       }),
-      error: () => this.errorMessage.set(`Не удалось восстановить «${item.name}».`),
+      error: () => this.toast.error(`Не удалось восстановить «${item.name}».`),
     });
   }
 
@@ -142,15 +136,14 @@ export class TrashComponent implements OnInit {
         this.deleteLoading.set(false);
         this.animateOut(item.folder_id, () => {
           this.folders.update(list => list.filter(f => f.folder_id !== item.folder_id));
-          this.actionMessage.set(`«${item.name}» удалена безвозвратно.`);
-          this.errorMessage.set('');
+          this.toast.success(`«${item.name}» удалена безвозвратно.`);
           this.usageSvc.refresh();
         });
       },
       error: () => {
         this.pendingDelete.set(null);
         this.deleteLoading.set(false);
-        this.errorMessage.set(`Не удалось удалить «${item.name}».`);
+        this.toast.error(`Не удалось удалить «${item.name}».`);
       },
     });
   }
@@ -169,14 +162,13 @@ export class TrashComponent implements OnInit {
         this.deleteLoading.set(false);
         this.blobs.set([]);
         this.folders.set([]);
-        this.actionMessage.set('Корзина очищена.');
-        this.errorMessage.set('');
+        this.toast.success('Корзина очищена.');
         this.usageSvc.refresh();
       },
       error: () => {
         this.pendingDelete.set(null);
         this.deleteLoading.set(false);
-        this.errorMessage.set('Не удалось очистить корзину.');
+        this.toast.error('Не удалось очистить корзину.');
       },
     });
   }
@@ -193,26 +185,26 @@ export class TrashComponent implements OnInit {
     this.pendingDelete.set(null);
   }
 
-  confirmModalTitle(): string {
+  readonly confirmModalTitle = computed((): string => {
     const p = this.pendingDelete();
     if (!p) return '';
     if (p.type === 'empty') return 'Очистить корзину?';
     const name = p.type === 'blob' ? p.item.file_name : p.item.name;
     return `Удалить «${name}»?`;
-  }
+  });
 
-  confirmModalBody(): string {
+  readonly confirmModalBody = computed((): string => {
     const p = this.pendingDelete();
     if (!p) return '';
     if (p.type === 'empty') return 'Все файлы и папки будут удалены безвозвратно. Это действие нельзя отменить.';
     return 'Файл будет удалён безвозвратно. Это действие нельзя отменить.';
-  }
+  });
 
-  confirmModalLabel(): string {
+  readonly confirmModalLabel = computed((): string => {
     const p = this.pendingDelete();
     if (p?.type === 'empty') return 'Очистить корзину';
     return 'Удалить';
-  }
+  });
 
   private animateOut(id: string, after: () => void): void {
     this.fadingOut.update(s => new Set([...s, id]));

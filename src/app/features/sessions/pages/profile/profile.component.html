@@ -33,6 +33,13 @@
 
   <!-- Sessions -->
   <div class="section-title">Активные сессии</div>
-  <app-sessions />
+  <app-sessions
+    [sessions]="sessions()"
+    [isLoading]="isLoading()"
+    [revoking]="revoking()"
+    [errorMessage]="errorMessage()"
+    (sessionRevoked)="onRevokeSession($event)"
+    (othersRevoked)="onRevokeOthers()"
+  />
 
 </div>

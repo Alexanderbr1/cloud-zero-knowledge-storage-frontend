@@ -132,21 +132,58 @@
   margin-top: -2px;
 }
 
-/* ─── Password strength meter ────────────────────────────────────────────── */
+/* ─── Password strength tooltip ──────────────────────────────────────────── */
 /*
- * --pw-c: cascade token set on .pw-meter--* and consumed by bar & label.
+ * --pw-c: cascade token set on .pw-tooltip--* and consumed by bar & label.
  * Only "fair" orange (#C96800) is hardcoded — no orange token in the system.
  */
-.pw-meter {
+.pw-anchor {
+  position: relative;
+}
+
+.pw-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 2px;
+
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity var(--t), transform var(--t);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 14px;
+    width: 8px;
+    height: 8px;
+    background: var(--c-surface);
+    border-left: 1px solid var(--c-border);
+    border-top: 1px solid var(--c-border);
+    transform: rotate(45deg);
+  }
 
   &--weak   { --pw-c: var(--c-danger); }
   &--fair   { --pw-c: #C96800; }
   &--good   { --pw-c: var(--c-warning); }
   &--strong { --pw-c: var(--c-success); }
+}
+
+.pw-anchor:focus-within .pw-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .pw-bar-row {

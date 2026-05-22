@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 
@@ -11,6 +12,7 @@ const EVENT_LABELS: Record<string, string> = {
   login_success:           'Вход в аккаунт',
   login_failed:            'Неудачная попытка входа',
   logout:                  'Выход из аккаунта',
+  password_reset:          'Пароль сброшен',
   session_revoked:         'Завершена сессия',
   sessions_revoked_other:  'Завершены другие сессии',
   file_uploaded:           'Файл загружен',
@@ -34,6 +36,7 @@ const EVENT_ICON_CLASS: Record<string, string> = {
   login_success:           'event-icon--success',
   login_failed:            'event-icon--danger',
   logout:                  'event-icon--neutral',
+  password_reset:          'event-icon--warn',
   session_revoked:         'event-icon--warn',
   sessions_revoked_other:  'event-icon--warn',
   file_uploaded:           'event-icon--success',
@@ -78,9 +81,11 @@ function resolveIconType(type: string): IconType {
   imports: [RouterLink, DatePipe],
   templateUrl: './activity.component.html',
   styleUrl: './activity.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ActivityComponent implements OnInit {
   private readonly auditService = inject(AuditService);
+  private readonly destroyRef   = inject(DestroyRef);
 
   readonly events = signal<readonly AuditEvent[]>([]);
   readonly loading = signal(true);
@@ -114,7 +119,9 @@ export class ActivityComponent implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set(null);
-    this.auditService.list(this.pageSize).subscribe({
+    this.auditService.list(this.pageSize).pipe(
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
       next: evts => {
         this.events.set(evts);
         this.hasMore.set(evts.length === this.pageSize);
@@ -133,7 +140,9 @@ export class ActivityComponent implements OnInit {
     if (!oldest) return;
 
     this.loadingMore.set(true);
-    this.auditService.list(this.pageSize, oldest.created_at).subscribe({
+    this.auditService.list(this.pageSize, oldest.created_at).pipe(
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
       next: evts => {
         this.events.update(prev => [...prev, ...evts]);
         this.hasMore.set(evts.length === this.pageSize);

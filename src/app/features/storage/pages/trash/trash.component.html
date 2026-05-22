@@ -3,11 +3,11 @@
   <div class="page-header">
     <div class="page-header__title">
       <h1 class="page-title">Корзина</h1>
-      @if (!isEmpty && !isLoading()) {
+      @if (!isEmpty() && !isLoading()) {
         <span class="item-count">{{ folders().length + blobs().length }}</span>
       }
     </div>
-    @if (!isEmpty && !isLoading()) {
+    @if (!isEmpty() && !isLoading()) {
       <div class="page-header__actions">
         <button type="button" class="btn btn--danger btn--sm" (click)="emptyTrash()">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -19,13 +19,6 @@
       </div>
     }
   </div>
-
-  @if (actionMessage()) {
-    <div class="alert alert--success" role="status">{{ actionMessage() }}</div>
-  }
-  @if (errorMessage()) {
-    <div class="alert alert--error" role="alert">{{ errorMessage() }}</div>
-  }
 
   <div class="trash-hint text-sm text-muted">
     <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
@@ -59,7 +52,7 @@
           </li>
         }
       </ul>
-    } @else if (isEmpty) {
+    } @else if (isEmpty()) {
       <div class="table-empty">
         <div class="empty-illustration" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" width="160" viewBox="0 0 160 190">

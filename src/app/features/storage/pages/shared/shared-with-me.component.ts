@@ -1,13 +1,12 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { finalize, from, switchMap } from 'rxjs';
+import { finalize } from 'rxjs';
 
 import { AuthService } from '../../../../core/services/auth.service';
-import { CryptoService } from '../../../../core/services/crypto.service';
 import { ShareItem, SharingService } from '../../../../core/services/sharing.service';
 import { ToastService } from '../../../../core/services/toast.service';
-import { shortMimeType, triggerBrowserDownload } from '../../../../core/utils/browser.utils';
+import { shortMimeType } from '../../../../core/utils/browser.utils';
 
 @Component({
     selector: 'app-shared-with-me',
@@ -18,7 +17,6 @@ import { shortMimeType, triggerBrowserDownload } from '../../../../core/utils/br
 })
 export class SharedWithMeComponent implements OnInit {
   private readonly sharingService = inject(SharingService);
-  private readonly crypto = inject(CryptoService);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
@@ -46,8 +44,7 @@ export class SharedWithMeComponent implements OnInit {
     if (this.downloadingId() === item.share_id) return;
     this.downloadingId.set(item.share_id);
 
-    this.sharingService.getSharedFile(item.share_id).pipe(
-      switchMap(result => from(this.fetchAndSave(result, item.content_type))),
+    this.sharingService.downloadSharedFile(item.share_id, item.content_type).pipe(
       finalize(() => this.downloadingId.set(null)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
@@ -65,17 +62,5 @@ export class SharedWithMeComponent implements OnInit {
 
   shortType(mime: string): string {
     return shortMimeType(mime);
-  }
-
-  private async fetchAndSave(
-    result: { downloadUrl: string; fileKey: CryptoKey; fileIVb64: string; fileName: string; ownerUserId: string },
-    contentType: string,
-  ): Promise<void> {
-    const resp = await fetch(result.downloadUrl);
-    if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
-    const encrypted = await resp.arrayBuffer();
-    const aad = result.ownerUserId ? new TextEncoder().encode(result.ownerUserId) : undefined;
-    const plaintext = await this.crypto.decryptFile(encrypted, result.fileKey, result.fileIVb64, aad);
-    triggerBrowserDownload(plaintext, result.fileName, contentType);
   }
 }

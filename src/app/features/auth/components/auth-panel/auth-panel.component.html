@@ -59,7 +59,7 @@
         }
       </div>
 
-      <div class="auth-field">
+      <div class="auth-field" [class.pw-anchor]="mode() === 'register'">
         <label class="auth-label" for="auth-password">Пароль</label>
         <input
           id="auth-password"
@@ -76,12 +76,12 @@
         }
 
         @if (mode() === 'register') {
-          <div class="pw-meter"
-            [class.pw-meter--weak]="strengthLevel() === 1"
-            [class.pw-meter--fair]="strengthLevel() === 2"
-            [class.pw-meter--good]="strengthLevel() === 3"
-            [class.pw-meter--strong]="strengthLevel() === 4">
-
+          <div class="pw-tooltip"
+               [class.pw-tooltip--weak]="strengthLevel() === 1"
+               [class.pw-tooltip--fair]="strengthLevel() === 2"
+               [class.pw-tooltip--good]="strengthLevel() === 3"
+               [class.pw-tooltip--strong]="strengthLevel() === 4"
+               role="tooltip">
             <div class="pw-bar-row">
               <div class="pw-bar">
                 @for (seg of strengthSegs; track seg) {
@@ -92,7 +92,6 @@
                 <span class="pw-label">{{ strengthLabel() }}</span>
               }
             </div>
-
             <ul class="pw-reqs">
               @for (req of strengthReqs(); track req.label) {
                 <li class="pw-req" [class.pw-req--met]="req.met">
@@ -108,7 +107,6 @@
                 </li>
               }
             </ul>
-
           </div>
         }
       </div>

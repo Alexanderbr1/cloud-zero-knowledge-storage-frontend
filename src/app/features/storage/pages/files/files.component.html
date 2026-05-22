@@ -569,9 +569,14 @@
 @if (moveTarget()) {
   <app-folder-picker
     [title]="'Переместить «' + moveTarget()!.name + '»'"
+    [folders]="pickerFolders()"
+    [breadcrumbs]="pickerBreadcrumbs()"
+    [loading]="pickerLoading()"
     [excludeFolderId]="moveTarget()!.type === 'folder' ? moveTarget()!.id : null"
     (picked)="onMovePicked($event)"
     (cancelled)="moveTarget.set(null)"
+    (navigateInto)="onPickerNavigateInto($event)"
+    (navigateTo)="onPickerNavigateTo($event)"
   />
 }
 

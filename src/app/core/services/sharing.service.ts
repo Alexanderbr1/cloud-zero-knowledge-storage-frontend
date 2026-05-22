@@ -1,6 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, firstValueFrom, from, map, throwError } from 'rxjs';
+import { Observable, firstValueFrom, from, map, switchMap, throwError } from 'rxjs';
+
+import { triggerBrowserDownload } from '../utils/browser.utils';
 
 import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
@@ -121,5 +123,24 @@ export class SharingService {
   /** Revoke a share (owner only). */
   revokeShare(shareId: string): Observable<void> {
     return this.http.delete<void>(`${this.sharesBase}/${shareId}`);
+  }
+
+  /** Download, decrypt and save a shared file (recipient side). */
+  downloadSharedFile(shareId: string, contentType: string): Observable<void> {
+    return this.getSharedFile(shareId).pipe(
+      switchMap(result => from(this.fetchDecryptAndSave(result, contentType))),
+    );
+  }
+
+  private async fetchDecryptAndSave(
+    result: { downloadUrl: string; fileKey: CryptoKey; fileIVb64: string; fileName: string; ownerUserId: string },
+    contentType: string,
+  ): Promise<void> {
+    const resp = await fetch(result.downloadUrl);
+    if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
+    const encrypted = await resp.arrayBuffer();
+    const aad = result.ownerUserId ? new TextEncoder().encode(result.ownerUserId) : undefined;
+    const plaintext = await this.crypto.decryptFile(encrypted, result.fileKey, result.fileIVb64, aad);
+    triggerBrowserDownload(plaintext, result.fileName, contentType);
   }
 }

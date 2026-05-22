@@ -1,8 +1,8 @@
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
-  Component, DestroyRef, ElementRef, HostListener, NgZone, OnInit,
-  ViewChild, computed, inject, signal,
+  ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, NgZone, OnInit,
+  computed, inject, signal, viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription, catchError, debounceTime, distinctUntilChanged, finalize, forkJoin, from, of, switchMap } from 'rxjs';
@@ -28,7 +28,8 @@ interface SearchResults {
     selector: 'app-files',
     imports: [DatePipe, InputModalComponent, FolderPickerComponent],
     templateUrl: './files.component.html',
-    styleUrl: './files.component.scss'
+    styleUrl: './files.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FilesComponent implements OnInit {
   private readonly filesService     = inject(FilesService);
@@ -40,8 +41,8 @@ export class FilesComponent implements OnInit {
   private readonly toast            = inject(ToastService);
   private readonly ngZone           = inject(NgZone);
 
-  @ViewChild('fileInput')       private fileInputRef?: ElementRef<HTMLInputElement>;
-  @ViewChild('shareEmailInput') private shareEmailInputRef?: ElementRef<HTMLInputElement>;
+  private readonly fileInputRef       = viewChild<ElementRef<HTMLInputElement>>('fileInput');
+  private readonly shareEmailInputRef = viewChild<ElementRef<HTMLInputElement>>('shareEmailInput');
 
   // ─── File state ───────────────────────────────────────────────────────────
 
@@ -141,9 +142,12 @@ export class FilesComponent implements OnInit {
   readonly newFolderName       = signal('');
   readonly creatingFolderError = signal('');
 
-  // ─── Move dialog ──────────────────────────────────────────────────────────
+  // ─── Move dialog + folder picker ─────────────────────────────────────────
 
-  readonly moveTarget = signal<{ type: 'file' | 'folder'; id: string; name: string } | null>(null);
+  readonly moveTarget          = signal<{ type: 'file' | 'folder'; id: string; name: string } | null>(null);
+  readonly pickerFolders       = signal<FolderItem[]>([]);
+  readonly pickerBreadcrumbs   = signal<BreadcrumbItem[]>([{ folder_id: null, name: 'Мой диск' }]);
+  readonly pickerLoading       = signal(false);
 
   // ─── Rename modal ─────────────────────────────────────────────────────────
 
@@ -284,10 +288,6 @@ export class FilesComponent implements OnInit {
     this.isCreatingFolder.set(true);
     this.newFolderName.set('');
     this.creatingFolderError.set('');
-    setTimeout(() => {
-      const input = document.querySelector<HTMLInputElement>('.modal-input');
-      input?.focus();
-    });
   }
 
   cancelCreateFolder(): void {
@@ -323,10 +323,6 @@ export class FilesComponent implements OnInit {
     this.renameInputValue.set(target.name);
     this.renameError.set('');
     this.isRenaming.set(false);
-    setTimeout(() => {
-      const input = document.querySelector<HTMLInputElement>('.modal-input');
-      if (input) { input.focus(); input.select(); }
-    });
   }
 
   closeRenameModal(): void {
@@ -460,6 +456,32 @@ export class FilesComponent implements OnInit {
     event.stopPropagation();
     this.closeMenu();
     this.moveTarget.set(item);
+    this.pickerBreadcrumbs.set([{ folder_id: null, name: 'Мой диск' }]);
+    this.loadPickerFolders(null);
+  }
+
+  onPickerNavigateInto(folder: FolderItem): void {
+    this.pickerBreadcrumbs.update(b => [...b, { folder_id: folder.folder_id, name: folder.name }]);
+    this.loadPickerFolders(folder.folder_id);
+  }
+
+  onPickerNavigateTo(index: number): void {
+    const crumbs = this.pickerBreadcrumbs();
+    const crumb = crumbs[index];
+    if (!crumb) return;
+    this.pickerBreadcrumbs.set(crumbs.slice(0, index + 1));
+    this.loadPickerFolders(crumb.folder_id);
+  }
+
+  private loadPickerFolders(folderId: string | null): void {
+    this.pickerLoading.set(true);
+    this.filesService.listFolders(folderId).pipe(
+      finalize(() => this.pickerLoading.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: folders => this.pickerFolders.set(folders),
+      error: () => {},
+    });
   }
 
   onMovePicked(folderId: string | null): void {
@@ -543,7 +565,7 @@ export class FilesComponent implements OnInit {
 
   openFilePicker(): void {
     this.isSelectingFile.set(true);
-    const el = this.fileInputRef?.nativeElement;
+    const el = this.fileInputRef()?.nativeElement;
     this.ngZone.runOutsideAngular(() => el?.click());
   }
 
@@ -565,7 +587,7 @@ export class FilesComponent implements OnInit {
           this.uploadSub = null;
           this.uploadPhase.set('idle');
           this.uploadProgress.set(0);
-          if (this.fileInputRef) this.fileInputRef.nativeElement.value = '';
+          const fileRef = this.fileInputRef(); if (fileRef) fileRef.nativeElement.value = '';
         }),
         takeUntilDestroyed(this.destroyRef),
       )
@@ -682,7 +704,7 @@ export class FilesComponent implements OnInit {
     this.shareEmail.set('');
     this.shareError.set('');
     this.loadFileShares(file.blob_id);
-    setTimeout(() => this.shareEmailInputRef?.nativeElement.focus());
+    setTimeout(() => this.shareEmailInputRef()?.nativeElement.focus());
   }
 
   closeAccessDialog(): void {

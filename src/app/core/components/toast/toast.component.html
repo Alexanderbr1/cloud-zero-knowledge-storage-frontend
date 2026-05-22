@@ -1,5 +1,5 @@
 <div class="toast-stack" aria-live="polite" aria-atomic="false">
-  @for (toast of toastService.toasts(); track trackById($index, toast)) {
+  @for (toast of toastService.toasts(); track toast.id) {
     <div
       class="toast"
       [class.toast--success]="toast.type === 'success'"
