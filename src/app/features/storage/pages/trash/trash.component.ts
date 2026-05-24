@@ -1,14 +1,9 @@
-import { DatePipe } from '@angular/common';
 import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  OnInit,
-  computed,
-  inject,
-  signal,
+  ChangeDetectionStrategy, Component, DestroyRef, OnInit,
+  computed, inject, signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DatePipe } from '@angular/common';
 import { finalize } from 'rxjs';
 
 import { shortMimeType } from '../../../../core/utils/browser.utils';
@@ -24,39 +19,31 @@ type PendingDelete =
   | { type: 'empty' };
 
 @Component({
-    selector: 'app-trash',
-    imports: [DatePipe, ConfirmModalComponent],
-    templateUrl: './trash.component.html',
-    styleUrl: './trash.component.scss',
-    changeDetection: ChangeDetectionStrategy.OnPush
+  selector: 'app-trash',
+  imports: [DatePipe, ConfirmModalComponent],
+  templateUrl: './trash.component.html',
+  styleUrl: './trash.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TrashComponent implements OnInit {
   private readonly filesService = inject(FilesService);
-  private readonly usageSvc = inject(StorageUsageService);
-  private readonly toast = inject(ToastService);
-  private readonly destroyRef = inject(DestroyRef);
+  private readonly usageSvc     = inject(StorageUsageService);
+  private readonly toast        = inject(ToastService);
+  private readonly destroyRef   = inject(DestroyRef);
 
-  readonly blobs = signal<readonly TrashFileItem[]>([]);
-  readonly folders = signal<readonly TrashFolderItem[]>([]);
-  readonly isLoading = signal(false);
+  readonly blobs         = signal<readonly TrashFileItem[]>([]);
+  readonly folders       = signal<readonly TrashFolderItem[]>([]);
+  readonly isLoading     = signal(false);
   readonly pendingDelete = signal<PendingDelete | null>(null);
   readonly deleteLoading = signal(false);
+  readonly isEmpty       = computed(() => this.blobs().length === 0 && this.folders().length === 0);
 
   private readonly fadingOut = signal(new Set<string>());
 
-  readonly isEmpty = computed(() => this.blobs().length === 0 && this.folders().length === 0);
+  protected readonly shortType = shortMimeType;
+  protected readonly isFading  = (id: string) => this.fadingOut().has(id);
 
-  isFading(id: string): boolean {
-    return this.fadingOut().has(id);
-  }
-
-  shortType(mime: string): string {
-    return shortMimeType(mime);
-  }
-
-  ngOnInit(): void {
-    this.load();
-  }
+  ngOnInit(): void { this.load(); }
 
   load(): void {
     this.isLoading.set(true);
@@ -91,22 +78,15 @@ export class TrashComponent implements OnInit {
   private doHardDeleteBlob(item: TrashFileItem): void {
     this.deleteLoading.set(true);
     this.filesService.hardDeleteBlob(item.blob_id).pipe(
+      finalize(() => { this.deleteLoading.set(false); this.pendingDelete.set(null); }),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: () => {
-        this.pendingDelete.set(null);
-        this.deleteLoading.set(false);
-        this.animateOut(item.blob_id, () => {
-          this.blobs.update(list => list.filter(b => b.blob_id !== item.blob_id));
-          this.toast.success(`«${item.file_name}» удалён безвозвратно.`);
-          this.usageSvc.refresh();
-        });
-      },
-      error: () => {
-        this.pendingDelete.set(null);
-        this.deleteLoading.set(false);
-        this.toast.error(`Не удалось удалить «${item.file_name}».`);
-      },
+      next: () => this.animateOut(item.blob_id, () => {
+        this.blobs.update(list => list.filter(b => b.blob_id !== item.blob_id));
+        this.toast.success(`«${item.file_name}» удалён безвозвратно.`);
+        this.usageSvc.refresh();
+      }),
+      error: () => this.toast.error(`Не удалось удалить «${item.file_name}».`),
     });
   }
 
@@ -129,22 +109,15 @@ export class TrashComponent implements OnInit {
   private doHardDeleteFolder(item: TrashFolderItem): void {
     this.deleteLoading.set(true);
     this.filesService.hardDeleteFolder(item.folder_id).pipe(
+      finalize(() => { this.deleteLoading.set(false); this.pendingDelete.set(null); }),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: () => {
-        this.pendingDelete.set(null);
-        this.deleteLoading.set(false);
-        this.animateOut(item.folder_id, () => {
-          this.folders.update(list => list.filter(f => f.folder_id !== item.folder_id));
-          this.toast.success(`«${item.name}» удалена безвозвратно.`);
-          this.usageSvc.refresh();
-        });
-      },
-      error: () => {
-        this.pendingDelete.set(null);
-        this.deleteLoading.set(false);
-        this.toast.error(`Не удалось удалить «${item.name}».`);
-      },
+      next: () => this.animateOut(item.folder_id, () => {
+        this.folders.update(list => list.filter(f => f.folder_id !== item.folder_id));
+        this.toast.success(`«${item.name}» удалена безвозвратно.`);
+        this.usageSvc.refresh();
+      }),
+      error: () => this.toast.error(`Не удалось удалить «${item.name}».`),
     });
   }
 
@@ -155,21 +128,16 @@ export class TrashComponent implements OnInit {
   private doEmptyTrash(): void {
     this.deleteLoading.set(true);
     this.filesService.emptyTrash().pipe(
+      finalize(() => { this.deleteLoading.set(false); this.pendingDelete.set(null); }),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: () => {
-        this.pendingDelete.set(null);
-        this.deleteLoading.set(false);
         this.blobs.set([]);
         this.folders.set([]);
         this.toast.success('Корзина очищена.');
         this.usageSvc.refresh();
       },
-      error: () => {
-        this.pendingDelete.set(null);
-        this.deleteLoading.set(false);
-        this.toast.error('Не удалось очистить корзину.');
-      },
+      error: () => this.toast.error('Не удалось очистить корзину.'),
     });
   }
 
@@ -181,9 +149,7 @@ export class TrashComponent implements OnInit {
     if (p.type === 'empty')  this.doEmptyTrash();
   }
 
-  cancelDelete(): void {
-    this.pendingDelete.set(null);
-  }
+  cancelDelete(): void { this.pendingDelete.set(null); }
 
   readonly confirmModalTitle = computed((): string => {
     const p = this.pendingDelete();

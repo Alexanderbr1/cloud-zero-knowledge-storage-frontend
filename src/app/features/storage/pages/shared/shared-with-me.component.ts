@@ -1,6 +1,8 @@
-import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DatePipe } from '@angular/common';
 import { finalize } from 'rxjs';
 
 import { AuthService } from '../../../../core/services/auth.service';
@@ -9,25 +11,25 @@ import { ToastService } from '../../../../core/services/toast.service';
 import { shortMimeType } from '../../../../core/utils/browser.utils';
 
 @Component({
-    selector: 'app-shared-with-me',
-    imports: [DatePipe],
-    templateUrl: './shared-with-me.component.html',
-    styleUrl: './shared-with-me.component.scss',
-    changeDetection: ChangeDetectionStrategy.OnPush
+  selector: 'app-shared-with-me',
+  imports: [DatePipe],
+  templateUrl: './shared-with-me.component.html',
+  styleUrl: './shared-with-me.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SharedWithMeComponent implements OnInit {
   private readonly sharingService = inject(SharingService);
-  private readonly auth = inject(AuthService);
-  private readonly toast = inject(ToastService);
-  private readonly destroyRef = inject(DestroyRef);
+  private readonly auth           = inject(AuthService);
+  private readonly toast          = inject(ToastService);
+  private readonly destroyRef     = inject(DestroyRef);
 
-  readonly shares = signal<ShareItem[]>([]);
-  readonly isLoading = signal(false);
+  readonly shares        = signal<ShareItem[]>([]);
+  readonly isLoading     = signal(false);
   readonly downloadingId = signal<string | null>(null);
 
-  ngOnInit(): void {
-    this.load();
-  }
+  protected readonly shortType = shortMimeType;
+
+  ngOnInit(): void { this.load(); }
 
   load(): void {
     this.isLoading.set(true);
@@ -58,9 +60,5 @@ export class SharedWithMeComponent implements OnInit {
         this.toast.error(`Не удалось скачать «${item.file_name}».`);
       },
     });
-  }
-
-  shortType(mime: string): string {
-    return shortMimeType(mime);
   }
 }

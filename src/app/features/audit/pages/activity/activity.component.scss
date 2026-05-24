@@ -2,31 +2,6 @@
 
 .page-container { flex: 1; display: flex; flex-direction: column; }
 
-/* ─── Breadcrumb ──────────────────────────────────────────────────────────── */
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-}
-
-.breadcrumb__back {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--c-text-secondary);
-  text-decoration: none;
-  padding: 3px 6px;
-  border-radius: var(--r-sm);
-  transition: color var(--t), background var(--t);
-
-  &:hover { color: var(--c-primary); background: var(--c-surface-hover); }
-  &:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm); }
-}
-
-.breadcrumb__sep { color: var(--c-border-strong); }
-.breadcrumb__current { font-weight: 500; color: var(--c-text); }
-
 /* ─── Card ────────────────────────────────────────────────────────────────── */
 .activity-card {
   flex: 1;
@@ -77,11 +52,10 @@
 /* ─── Filter toolbar ──────────────────────────────────────────────────────── */
 .filter-toolbar {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 24px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--c-border);
-  flex-wrap: wrap;
 }
 
 .filter-group {
@@ -112,7 +86,6 @@
 
 .search-box {
   position: relative;
-  margin-left: auto;
 }
 
 .search-icon {
@@ -133,7 +106,7 @@
   border-radius: var(--r-sm);
   background: var(--c-surface);
   color: var(--c-text);
-  width: 220px;
+  width: 100%;
   transition: border-color var(--t), box-shadow var(--t);
 
   &::placeholder { color: var(--c-text-secondary); }
@@ -193,39 +166,6 @@
 }
 
 .event-meta__sep { opacity: 0.4; }
-
-/* ─── States ──────────────────────────────────────────────────────────────── */
-.state-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  gap: 10px;
-  padding: 40px 24px;
-  text-align: center;
-  animation: fadeIn 0.3s ease both;
-}
-
-.empty-illustration {
-  flex-shrink: 0;
-  color: var(--c-border-strong);
-  margin-bottom: 2px;
-}
-
-.empty-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--c-text);
-  margin: 0;
-}
-
-.empty-hint {
-  font-size: 13px;
-  margin: 0;
-  max-width: 280px;
-  line-height: 1.5;
-}
 
 .spinner {
   width: 28px;

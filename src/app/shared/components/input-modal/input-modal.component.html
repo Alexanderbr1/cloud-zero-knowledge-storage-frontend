@@ -27,7 +27,7 @@
         [placeholder]="placeholder()"
         [value]="value()"
         [disabled]="loading()"
-        (input)="value.set($any($event.target).value)"
+        (input)="onInput($event)"
         (keydown.enter)="onConfirm()"
         (keydown.escape)="cancelled.emit()"
       />

@@ -9,11 +9,11 @@ import { SessionsService } from '../../services/sessions.service';
 import { SessionsComponent } from '../../components/sessions-list/sessions.component';
 
 @Component({
-    selector: 'app-profile',
-    imports: [RouterLink, SessionsComponent],
-    templateUrl: './profile.component.html',
-    styleUrl: './profile.component.scss',
-    changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-profile',
+  imports: [RouterLink, SessionsComponent],
+  templateUrl: './profile.component.html',
+  styleUrl: './profile.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProfileComponent implements OnInit {
   private readonly auth            = inject(AuthService);
@@ -21,20 +21,15 @@ export class ProfileComponent implements OnInit {
   private readonly destroyRef      = inject(DestroyRef);
   private readonly router          = inject(Router);
 
-  readonly email = computed(() => this.auth.email() ?? '—');
-  readonly userInitial = computed(() => {
-    const e = this.auth.email();
-    return e ? e.charAt(0).toUpperCase() : '?';
-  });
+  readonly email       = computed(() => this.auth.email() ?? '—');
+  readonly userInitial = computed(() => this.auth.email()?.charAt(0).toUpperCase() ?? '?');
 
-  readonly sessions      = signal<readonly DeviceSession[]>([]);
-  readonly isLoading     = signal(false);
-  readonly revoking      = signal<string | null>(null);
-  readonly errorMessage  = signal('');
+  readonly sessions     = signal<readonly DeviceSession[]>([]);
+  readonly isLoading    = signal(false);
+  readonly revoking     = signal<string | null>(null);
+  readonly errorMessage = signal('');
 
-  ngOnInit(): void {
-    this.loadSessions();
-  }
+  ngOnInit(): void { this.loadSessions(); }
 
   private loadSessions(): void {
     this.isLoading.set(true);
@@ -43,7 +38,7 @@ export class ProfileComponent implements OnInit {
       finalize(() => this.isLoading.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: s => this.sessions.set(s),
+      next:  s  => this.sessions.set(s),
       error: () => this.errorMessage.set('Не удалось загрузить список сессий.'),
     });
   }
@@ -54,7 +49,7 @@ export class ProfileComponent implements OnInit {
       finalize(() => this.revoking.set(null)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: () => this.sessions.update(list => list.filter(s => s.id !== session.id)),
+      next:  () => this.sessions.update(list => list.filter(s => s.id !== session.id)),
       error: () => this.errorMessage.set('Не удалось завершить сессию.'),
     });
   }
@@ -65,7 +60,7 @@ export class ProfileComponent implements OnInit {
       finalize(() => this.revoking.set(null)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: () => this.sessions.update(list => list.filter(s => s.is_current)),
+      next:  () => this.sessions.update(list => list.filter(s => s.is_current)),
       error: () => this.errorMessage.set('Не удалось завершить другие сессии.'),
     });
   }

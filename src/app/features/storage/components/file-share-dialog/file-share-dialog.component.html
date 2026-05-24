@@ -1,0 +1,118 @@
+<div class="modal-backdrop" (click)="close()">
+  <div class="modal-card card" role="dialog" aria-modal="true" aria-labelledby="access-dialog-title"
+       (click)="$event.stopPropagation()">
+
+    <div class="modal-header">
+      <div class="modal-header__text">
+        <h2 class="modal-title" id="access-dialog-title">Управление доступом</h2>
+        <p class="modal-subtitle text-muted text-sm" [attr.title]="file().file_name">
+          {{ file().file_name }}
+        </p>
+      </div>
+      <button type="button" class="btn btn--ghost btn--sm btn--icon modal-close"
+              aria-label="Закрыть" (click)="close()">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <hr class="modal-divider">
+
+    <div class="modal-section">
+      <p class="section-label">Открыть доступ</p>
+      <div class="add-row">
+        <input
+          #emailInput
+          type="email"
+          class="form-input"
+          placeholder="email@example.com"
+          autocomplete="off"
+          [value]="shareEmail()"
+          [disabled]="isSharing()"
+          (input)="onEmailInput($event)"
+          (keydown.enter)="submit()"
+        />
+        <button
+          type="button"
+          class="btn btn--primary btn--sm"
+          [disabled]="isSharing() || !shareEmail().trim()"
+          (click)="submit()"
+        >
+          {{ isSharing() ? '…' : 'Добавить' }}
+        </button>
+      </div>
+      <div class="expiry-row">
+        <span class="expiry-label text-muted text-sm">Срок доступа</span>
+        <input
+          type="date"
+          class="form-input form-input--sm expiry-input"
+          [value]="expiresAt()"
+          [min]="minDate"
+          [disabled]="isSharing()"
+          (change)="onExpiresAtInput($event)"
+        />
+        @if (expiresAt()) {
+          <button type="button" class="btn btn--ghost btn--sm" (click)="clearExpiry()">Без срока</button>
+        }
+      </div>
+      @if (shareError()) {
+        <p class="share-error text-sm" role="alert">{{ shareError() }}</p>
+      }
+    </div>
+
+    <hr class="modal-divider">
+
+    <div class="modal-section">
+      <p class="section-label">
+        Кто имеет доступ
+        @if (hasShares()) {
+          <span class="section-count">{{ shares().length }}</span>
+        }
+      </p>
+
+      @if (isLoadingShares()) {
+        <p class="text-muted text-sm shares-empty">Загрузка…</p>
+      } @else {
+        @if (!hasShares()) {
+          <p class="text-muted text-sm shares-empty">Никому не открыт доступ.</p>
+        } @else {
+          <ul class="shares-list" role="list">
+            @for (share of shares(); track share.share_id) {
+              <li class="share-row">
+                <div class="share-avatar" aria-hidden="true">
+                  {{ (share.recipient_email ?? '?').charAt(0).toUpperCase() }}
+                </div>
+                <div class="share-info">
+                  <span class="share-email">{{ share.recipient_email ?? '—' }}</span>
+                  <span class="share-date text-muted text-sm">
+                    с {{ share.created_at | date: 'dd.MM.yyyy' }}
+                    @if (share.expires_at) { · до {{ share.expires_at | date: 'dd.MM.yyyy' }} }
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn--ghost btn--sm btn--icon btn--icon-danger"
+                  [attr.aria-label]="'Отозвать доступ для ' + share.recipient_email"
+                  [disabled]="revokingId() === share.share_id"
+                  (click)="revoke(share.share_id)"
+                >
+                  @if (revokingId() === share.share_id) {
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="spin" aria-hidden="true">
+                      <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.4" stroke-dasharray="18 12"/>
+                    </svg>
+                  } @else {
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                      <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                    </svg>
+                  }
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      }
+    </div>
+
+  </div>
+</div>

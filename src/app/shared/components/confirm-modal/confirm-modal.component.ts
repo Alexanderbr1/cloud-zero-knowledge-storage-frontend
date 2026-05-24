@@ -2,19 +2,18 @@ import { ChangeDetectionStrategy, Component, HostListener, input, output } from 
 
 @Component({
   selector: 'app-confirm-modal',
-  standalone: true,
   templateUrl: './confirm-modal.component.html',
   styleUrl: './confirm-modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ConfirmModalComponent {
-  title        = input.required<string>();
-  body         = input<string>();
-  confirmLabel = input<string>('Удалить');
-  loading      = input<boolean>(false);
+  readonly title        = input.required<string>();
+  readonly body         = input<string>();
+  readonly confirmLabel = input('Удалить');
+  readonly loading      = input(false);
 
-  confirmed = output<void>();
-  cancelled = output<void>();
+  readonly confirmed = output<void>();
+  readonly cancelled = output<void>();
 
   @HostListener('document:keydown.escape')
   onEscape(): void {

@@ -2,7 +2,6 @@
   <div class="picker-card card" role="dialog" aria-modal="true" [attr.aria-label]="title()"
        (click)="$event.stopPropagation()">
 
-    <!-- Header -->
     <div class="picker-header">
       <h2 class="picker-title">{{ title() }}</h2>
       <button type="button" class="btn btn--ghost btn--sm btn--icon" aria-label="Закрыть" (click)="cancel()">
@@ -12,7 +11,6 @@
       </button>
     </div>
 
-    <!-- Breadcrumb -->
     <div class="picker-breadcrumb">
       @for (crumb of breadcrumbs(); track (crumb.folder_id || 'root'); let i = $index, last = $last) {
         @if (!last) {
@@ -30,7 +28,6 @@
 
     <hr class="divider">
 
-    <!-- Folder list -->
     <div class="picker-body">
       @if (loading()) {
         <div class="picker-state">
@@ -69,7 +66,6 @@
       }
     </div>
 
-    <!-- Footer -->
     <div class="picker-footer">
       <button type="button" class="btn btn--ghost btn--sm" (click)="cancel()">Отмена</button>
       <button type="button" class="btn btn--primary btn--sm" (click)="confirm()">

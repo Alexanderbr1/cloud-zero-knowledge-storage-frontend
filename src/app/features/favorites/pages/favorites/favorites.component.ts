@@ -1,13 +1,14 @@
-import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DatePipe } from '@angular/common';
+import { Router } from '@angular/router';
 
 import { ToastService } from '../../../../core/services/toast.service';
 import { FilesService } from '../../../storage/services/files.service';
 import { FileItem } from '../../../storage/models/file-item.model';
 import { FolderItem } from '../../../storage/models/folder.model';
 import { FavoritesService } from '../../services/favorites.service';
-import { shortMimeType } from '../../../../core/utils/browser.utils';
+import { formatSize, shortMimeType } from '../../../../core/utils/browser.utils';
 
 @Component({
   selector: 'app-favorites',
@@ -21,15 +22,17 @@ export class FavoritesComponent implements OnInit {
   private readonly filesService     = inject(FilesService);
   private readonly toast            = inject(ToastService);
   private readonly destroyRef       = inject(DestroyRef);
+  private readonly router           = inject(Router);
 
-  readonly blobs    = signal<readonly FileItem[]>([]);
-  readonly folders  = signal<readonly FolderItem[]>([]);
-  readonly loading  = signal(true);
-  readonly error    = signal<string | null>(null);
+  readonly blobs   = signal<readonly FileItem[]>([]);
+  readonly folders = signal<readonly FolderItem[]>([]);
+  readonly loading = signal(true);
+  readonly error   = signal<string | null>(null);
 
-  ngOnInit(): void {
-    this.load();
-  }
+  protected readonly formatSize = formatSize;
+  protected readonly shortType  = shortMimeType;
+
+  ngOnInit(): void { this.load(); }
 
   load(): void {
     this.loading.set(true);
@@ -81,11 +84,9 @@ export class FavoritesComponent implements OnInit {
     });
   }
 
-  shortType(mime: string): string { return shortMimeType(mime); }
-
-  formatSize(bytes: number): string {
-    if (bytes < 1024)        return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  openFolder(folder: FolderItem): void {
+    this.router.navigate(['/files'], {
+      queryParams: { folder: folder.folder_id, folderName: folder.name },
+    });
   }
 }

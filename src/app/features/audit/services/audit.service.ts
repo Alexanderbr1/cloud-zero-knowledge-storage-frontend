@@ -12,11 +12,9 @@ export class AuditService {
 
   list(limit = 50, before?: string): Observable<readonly AuditEvent[]> {
     let params = new HttpParams().set('limit', limit);
-    if (before) {
-      params = params.set('before', before);
-    }
-    return this.http.get<ListAuditResponse>(this.base, { params }).pipe(
-      map(r => r.events ?? [])
-    );
+    if (before) params = params.set('before', before);
+    return this.http
+      .get<ListAuditResponse>(this.base, { params })
+      .pipe(map(r => r.events ?? []));
   }
 }

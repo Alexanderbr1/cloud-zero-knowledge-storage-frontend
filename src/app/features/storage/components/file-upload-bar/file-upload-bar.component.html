@@ -1,0 +1,47 @@
+<div class="upload-bar card">
+  <div class="upload-bar__top">
+    <div class="upload-bar__info">
+      <svg class="upload-bar__icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+        <rect x="2" y="1" width="11" height="16" rx="2" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M5 5h7M5 8h7M5 11h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+      <span class="upload-bar__name">{{ file().name }}</span>
+      <span class="text-muted text-sm">{{ formatSize(file().size) }}</span>
+    </div>
+    <button
+      type="button"
+      class="btn btn--ghost btn--sm btn--icon btn--icon-danger"
+      aria-label="Отменить загрузку"
+      (click)="cancel.emit()"
+    >
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+  <div class="upload-progress-wrap">
+    <div
+      class="upload-progress"
+      role="progressbar"
+      [attr.aria-valuenow]="phase() === 'encrypting' ? null : progress()"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      [attr.aria-valuetext]="phase() === 'encrypting' ? 'Шифрование…' : progress() + '%'"
+      [attr.aria-label]="'Загрузка ' + file().name"
+    >
+      <div
+        class="upload-progress__fill"
+        [class.upload-progress__fill--indeterminate]="phase() === 'encrypting'"
+        [style.width.%]="phase() !== 'encrypting' ? progress() : 0"
+      ></div>
+    </div>
+    <span class="upload-progress__label text-muted text-sm">
+      @switch (phase()) {
+        @case ('reading')    { Чтение {{ progress() }}% }
+        @case ('encrypting') { Шифрование… }
+        @case ('uploading')  { Загрузка {{ progress() }}% }
+        @default             { Подготовка… }
+      }
+    </span>
+  </div>
+</div>

@@ -2,9 +2,6 @@
 
 .page-container { flex: 1; display: flex; flex-direction: column; }
 
-/* ─── Alerts ──────────────────────────────────────────────────────────────── */
-.alert { margin-bottom: 16px; }
-
 /* ─── Hint bar ────────────────────────────────────────────────────────────── */
 .trash-hint {
   display: flex;
@@ -36,40 +33,13 @@
   letter-spacing: 0;
 }
 
-/* ─── Card ────────────────────────────────────────────────────────────────── */
-.files-card { overflow: hidden; flex: 1; display: flex; flex-direction: column; }
-
 /* ─── Table structure ─────────────────────────────────────────────────────── */
 .table-head,
-.table-row {
-  display: grid;
-  grid-template-columns: 1fr 80px 100px 76px;
-  align-items: center;
-  gap: 12px;
-}
-
-.table-head {
-  padding: 9px 20px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--c-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  user-select: none;
-}
-
-.table-list { list-style: none; }
+.table-row { grid-template-columns: 1fr 80px 100px 76px; }
 
 .table-row {
-  padding: 11px 20px;
-  border-bottom: 1px solid var(--c-border);
-  transition: background var(--t-fast);
-  min-height: 48px;
   animation: rowIn var(--t-spring) both;
   animation-delay: calc(var(--row-i, 0) * 28ms);
-
-  &:last-child { border-bottom: none; }
-  &:hover { background: var(--c-surface-hover); }
 }
 
 @keyframes rowIn {
@@ -77,7 +47,7 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Exit animation */
+/* ─── Row exit animation ──────────────────────────────────────────────────── */
 .table-row--removing {
   animation: rowOut 0.22s ease forwards !important;
   pointer-events: none;
@@ -85,138 +55,6 @@
 
 @keyframes rowOut {
   to { opacity: 0; transform: translateX(12px) scale(0.98); }
-}
-
-/* ─── Skeleton rows ───────────────────────────────────────────────────────── */
-.table-row--skeleton {
-  animation: none !important;
-  pointer-events: none;
-}
-
-.skeleton--icon {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--r-sm);
-  flex-shrink: 0;
-}
-
-.skeleton--name {
-  height: 13px;
-  width: 55%;
-  border-radius: var(--r-sm);
-}
-
-.skeleton--cell {
-  height: 13px;
-  width: 70%;
-  border-radius: var(--r-sm);
-}
-
-/* ─── Empty state ─────────────────────────────────────────────────────────── */
-.table-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  gap: 10px;
-  padding: 40px 24px;
-  text-align: center;
-  animation: fadeIn 0.3s ease both;
-}
-
-.empty-illustration { flex-shrink: 0; }
-
-.empty-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--c-text);
-  margin: 0;
-}
-
-.empty-hint {
-  font-size: 13px;
-  margin: 0;
-  max-width: 260px;
-  line-height: 1.5;
-}
-
-/* ─── Columns ─────────────────────────────────────────────────────────────── */
-.col-name {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.file-icon {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--r-sm);
-  background: var(--c-primary-subtle);
-  color: var(--c-primary);
-  transition: background var(--t);
-}
-
-.file-icon--folder {
-  background: var(--c-surface-hover);
-  color: var(--c-text-secondary);
-}
-
-.file-name-wrap {
-  min-width: 0;
-}
-
-.file-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--c-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: block;
-}
-
-.col-type,
-.col-date {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-/* ─── Action buttons — revealed on row hover ──────────────────────────────── */
-.col-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--t);
-}
-
-.table-row:hover .col-actions,
-.table-row:focus-within .col-actions {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.btn--icon-danger:hover:not(:disabled) {
-  color: var(--c-danger);
-  background: var(--c-danger-bg);
-}
-
-/* ─── Touch: always show actions ─────────────────────────────────────────── */
-@media (hover: none) and (pointer: coarse) {
-  .col-actions {
-    opacity: 1;
-    pointer-events: auto;
-  }
 }
 
 /* ─── Responsive ──────────────────────────────────────────────────────────── */

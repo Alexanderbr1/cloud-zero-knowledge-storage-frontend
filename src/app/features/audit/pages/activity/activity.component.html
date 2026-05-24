@@ -1,17 +1,7 @@
 <div class="page-container">
 
-  <!-- Header -->
   <div class="page-header">
-    <div class="breadcrumb">
-      <a routerLink="/files" class="breadcrumb__back">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        Мой диск
-      </a>
-      <span class="breadcrumb__sep" aria-hidden="true">/</span>
-      <span class="breadcrumb__current">Активность</span>
-    </div>
+    <h1 class="page-title">Активность</h1>
   </div>
 
   <div class="activity-card card">
@@ -21,8 +11,15 @@
     </div>
 
     @if (!loading() && !error() && events().length > 0) {
-      <!-- Filter + Search toolbar -->
       <div class="filter-toolbar">
+        <div class="search-box">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M9.5 9.5l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          <input class="search-input" type="search" placeholder="Поиск…" autocomplete="off"
+            [value]="searchQuery()" (input)="onSearchInput($event)" aria-label="Поиск по журналу"/>
+        </div>
         <div class="filter-group" role="group" aria-label="Фильтр по категории">
           <button type="button" class="filter-btn" [class.is-active]="activeFilter() === 'all'"
             (click)="setFilter('all')">Все</button>
@@ -33,28 +30,20 @@
           <button type="button" class="filter-btn" [class.is-active]="activeFilter() === 'auth'"
             (click)="setFilter('auth')">Сессии</button>
         </div>
-        <div class="search-box">
-          <svg class="search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1.3"/>
-            <path d="M9.5 9.5l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-          </svg>
-          <input class="search-input" type="search" placeholder="Поиск…" autocomplete="off"
-            [value]="searchQuery()" (input)="onSearchInput($event)" aria-label="Поиск по журналу"/>
-        </div>
       </div>
     }
 
     @if (loading()) {
-      <div class="state-empty">
+      <div class="table-empty">
         <div class="spinner" aria-label="Загрузка…"></div>
       </div>
     } @else if (error()) {
-      <div class="state-empty">
+      <div class="table-empty">
         <p class="text-secondary">{{ error() }}</p>
         <button type="button" class="btn btn--secondary" (click)="load()">Повторить</button>
       </div>
     } @else if (events().length === 0) {
-      <div class="state-empty">
+      <div class="table-empty">
         <div class="empty-illustration" aria-hidden="true">
           <svg width="72" height="72" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="9" stroke="var(--c-border-strong)" stroke-width="1.2"/>
@@ -66,7 +55,7 @@
         <p class="empty-hint text-muted">Здесь будут отображаться все действия в вашем аккаунте</p>
       </div>
     } @else if (filteredEvents().length === 0) {
-      <div class="state-empty">
+      <div class="table-empty">
         <div class="empty-illustration" aria-hidden="true">
           <svg width="72" height="72" viewBox="0 0 24 24" fill="none">
             <circle cx="11" cy="11" r="7" stroke="var(--c-border-strong)" stroke-width="1.2"/>

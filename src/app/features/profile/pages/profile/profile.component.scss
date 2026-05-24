@@ -1,34 +1,5 @@
 :host { display: block; }
 
-/* ─── Breadcrumb ──────────────────────────────────────────────────────────── */
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-}
-
-.breadcrumb__back {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--c-text-secondary);
-  text-decoration: none;
-  padding: 3px 6px;
-  border-radius: var(--r-sm);
-  transition: color var(--t), background var(--t);
-
-  &:hover { color: var(--c-primary); background: var(--c-surface-hover); }
-  &:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm); }
-}
-
-.breadcrumb__sep { color: var(--c-border-strong); }
-
-.breadcrumb__current {
-  font-weight: 500;
-  color: var(--c-text);
-}
-
 /* ─── User card ───────────────────────────────────────────────────────────── */
 .user-card {
   display: flex;

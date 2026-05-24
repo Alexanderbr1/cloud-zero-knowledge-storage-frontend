@@ -1,4 +1,4 @@
-import { inject, Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, from, map, switchMap, throwError } from 'rxjs';
 
@@ -85,14 +85,14 @@ export class FilesService {
     onProgress?: (phase: 'reading' | 'encrypting' | 'uploading', pct: number) => void,
     folderId?: string | null,
   ): Observable<PresignPutResponse> {
-    const masterKey = this.auth.getFileKey();
-    if (!masterKey) {
-      return throwError(() => new Error('Master key not available. Please log in again.'));
+    const kek = this.auth.getFileKey();
+    if (!kek) {
+      return throwError(() => new Error('KEK not available. Please log in again.'));
     }
 
     onProgress?.('reading', 0);
 
-    return from(this.prepareEncryptedUpload(file, masterKey, onProgress)).pipe(
+    return from(this.prepareEncryptedUpload(file, kek, onProgress)).pipe(
       switchMap(({ encryptedBuffer, wrappedKeyB64, ivB64 }) => {
         const contentType = file.type?.trim() || 'application/octet-stream';
         const payload: PresignPutRequest = {
@@ -122,13 +122,13 @@ export class FilesService {
     );
   }
 
-  downloadFile(blobId: string, fileName: string): Observable<void> {
+  downloadFile(blobId: string, fileName: string, onProgress?: (pct: number) => void): Observable<void> {
     return this.http
       .post<PresignGetResponse>(
         `${this.baseUrl}/blobs/${encodeURIComponent(blobId)}/presign-get`,
         {},
       )
-      .pipe(switchMap(resp => from(this.fetchAndDecrypt(resp, fileName))));
+      .pipe(switchMap(resp => from(this.fetchAndDecrypt(resp, fileName, onProgress))));
   }
 
   downloadFileToBuffer(blobId: string): Observable<ArrayBuffer> {
@@ -252,7 +252,7 @@ export class FilesService {
 
   private async prepareEncryptedUpload(
     file: File,
-    masterKey: CryptoKey,
+    kek: CryptoKey,
     onProgress?: (phase: 'reading' | 'encrypting' | 'uploading', pct: number) => void,
   ): Promise<{ encryptedBuffer: ArrayBuffer; wrappedKeyB64: string; ivB64: string }> {
     const plaintext = await this.readFileWithProgress(file, pct => onProgress?.('reading', pct));
@@ -260,13 +260,14 @@ export class FilesService {
     const fileKey = await this.crypto.generateFileKey();
     const aad = this.ownerAad();
     const { ciphertext, ivB64 } = await this.crypto.encryptFile(plaintext, fileKey, aad);
-    const wrappedKeyB64 = await this.crypto.wrapFileKey(fileKey, masterKey);
+    const wrappedKeyB64 = await this.crypto.wrapFileKey(fileKey, kek);
     return { encryptedBuffer: ciphertext, wrappedKeyB64, ivB64 };
   }
 
-  private ownerAad(ownerUserId?: string): Uint8Array | undefined {
+  private ownerAad(ownerUserId?: string): Uint8Array {
     const id = ownerUserId ?? this.auth.userId();
-    return id ? new TextEncoder().encode(id) : undefined;
+    if (!id) throw new Error('User ID unavailable — cannot derive AAD for file encryption.');
+    return new TextEncoder().encode(id);
   }
 
   private readFileWithProgress(file: File, onProgress: (pct: number) => void): Promise<ArrayBuffer> {
@@ -284,28 +285,51 @@ export class FilesService {
   }
 
   private async fetchAndDecryptToBuffer(resp: PresignGetResponse): Promise<ArrayBuffer> {
-    const masterKey = this.auth.getFileKey();
-    if (!masterKey) throw new Error('Master key not available. Please log in again.');
+    const kek = this.auth.getFileKey();
+    if (!kek) throw new Error('KEK not available. Please log in again.');
     const fetchResp = await fetch(resp.download_url);
     if (!fetchResp.ok) throw new Error(`Download failed with status ${fetchResp.status}`);
     const encrypted = await fetchResp.arrayBuffer();
-    const fileKey = await this.crypto.unwrapFileKey(resp.encrypted_file_key, masterKey);
+    const fileKey = await this.crypto.unwrapFileKey(resp.encrypted_file_key, kek);
     return this.crypto.decryptFile(encrypted, fileKey, resp.file_iv, this.ownerAad());
   }
 
-  private async fetchAndDecrypt(resp: PresignGetResponse, fileName: string): Promise<void> {
-    const masterKey = this.auth.getFileKey();
-    if (!masterKey) {
-      throw new Error('Master key not available. Please log in again.');
+  private async fetchAndDecrypt(resp: PresignGetResponse, fileName: string, onProgress?: (pct: number) => void): Promise<void> {
+    const kek = this.auth.getFileKey();
+    if (!kek) {
+      throw new Error('KEK not available. Please log in again.');
     }
 
     const fetchResp = await fetch(resp.download_url);
     if (!fetchResp.ok) {
       throw new Error(`Download failed with status ${fetchResp.status}`);
     }
-    const encryptedData = await fetchResp.arrayBuffer();
 
-    const fileKey = await this.crypto.unwrapFileKey(resp.encrypted_file_key, masterKey);
+    let encryptedData: ArrayBuffer;
+
+    if (onProgress && fetchResp.body) {
+      const total = parseInt(fetchResp.headers.get('Content-Length') ?? '0', 10);
+      const reader = fetchResp.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let received = 0;
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (total > 0) onProgress(Math.round((received / total) * 100));
+      }
+
+      const merged = new Uint8Array(received);
+      let offset = 0;
+      for (const chunk of chunks) { merged.set(chunk, offset); offset += chunk.length; }
+      encryptedData = merged.buffer;
+    } else {
+      encryptedData = await fetchResp.arrayBuffer();
+    }
+
+    const fileKey = await this.crypto.unwrapFileKey(resp.encrypted_file_key, kek);
     const plaintext = await this.crypto.decryptFile(encryptedData, fileKey, resp.file_iv, this.ownerAad());
 
     triggerBrowserDownload(plaintext, fileName, resp.content_type);

@@ -6,7 +6,6 @@
     <div class="sidebar-backdrop" aria-hidden="true" (click)="closeMenu()"></div>
   }
 
-  <!-- Sidebar -->
   <aside class="sidebar" [class.sidebar--open]="isMenuOpen()">
 
     <a routerLink="/files" class="sidebar__logo" aria-label="EncryptDrive — главная" (click)="closeMenu()">
@@ -35,11 +34,12 @@
         </svg>
         Доступные мне
       </a>
-      <a routerLink="/trash" routerLinkActive="sidebar__link--active" class="sidebar__link" (click)="closeMenu()">
+      <a routerLink="/favorites" routerLinkActive="sidebar__link--active" class="sidebar__link" (click)="closeMenu()">
         <svg class="sidebar__link-icon" width="17" height="17" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M3.5 3.5l.5 8.5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 .5-.5l.5-8.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M7 1.5l1.854 3.756 4.146.602-3 2.924.708 4.128L7 10.75l-3.708 1.96.708-4.128L1 5.858l4.146-.602L7 1.5z"
+                stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>
         </svg>
-        Корзина
+        Избранное
       </a>
       <a routerLink="/activity" routerLinkActive="sidebar__link--active" class="sidebar__link" (click)="closeMenu()">
         <svg class="sidebar__link-icon" width="17" height="17" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -48,18 +48,16 @@
         </svg>
         Активность
       </a>
-      <a routerLink="/favorites" routerLinkActive="sidebar__link--active" class="sidebar__link" (click)="closeMenu()">
+      <a routerLink="/trash" routerLinkActive="sidebar__link--active" class="sidebar__link" (click)="closeMenu()">
         <svg class="sidebar__link-icon" width="17" height="17" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path d="M7 1.5l1.854 3.756 4.146.602-3 2.924.708 4.128L7 10.75l-3.708 1.96.708-4.128L1 5.858l4.146-.602L7 1.5z"
-                stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>
+          <path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M3.5 3.5l.5 8.5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 .5-.5l.5-8.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        Избранное
+        Корзина
       </a>
     </nav>
 
     <div class="sidebar__spacer"></div>
 
-    <!-- Storage usage -->
     @if (storageUsage()) {
       <div class="sidebar__storage">
         <div class="storage-bar__header">
@@ -82,7 +80,6 @@
       </div>
     }
 
-    <!-- User -->
     <div class="sidebar__user">
       @if (isUserMenuOpen()) {
         <div class="sidebar__user-popup" role="menu" (click)="$event.stopPropagation()">
@@ -127,10 +124,8 @@
 
   </aside>
 
-  <!-- Content -->
   <div class="content-wrapper">
 
-    <!-- Mobile topbar -->
     <header class="topbar" role="banner">
       <button
         type="button"

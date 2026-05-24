@@ -1,10 +1,8 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { catchError, finalize, Observable, share, switchMap, throwError } from 'rxjs';
+import { catchError, switchMap, throwError } from 'rxjs';
 
 import { AuthService } from '../services/auth.service';
-
-let refreshInFlight$: Observable<void> | null = null;
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
@@ -27,19 +25,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => err);
       }
 
-      if (!refreshInFlight$) {
-        refreshInFlight$ = auth.refreshSession().pipe(
-          share({
-            resetOnError: true,
-            resetOnComplete: true,
-          }),
-          finalize(() => {
-            refreshInFlight$ = null;
-          })
-        );
-      }
-
-      return refreshInFlight$.pipe(
+      return auth.startOrJoinRefresh().pipe(
         switchMap(() => {
           const newToken = auth.accessToken();
           if (!newToken) {

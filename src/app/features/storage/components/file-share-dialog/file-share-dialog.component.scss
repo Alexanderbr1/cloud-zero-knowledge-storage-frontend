@@ -1,0 +1,133 @@
+.modal-card {
+  max-width: 440px;
+  max-height: calc(100dvh - 48px);
+}
+
+.modal-header { flex-shrink: 0; }
+
+.modal-title {
+  font-size: 16px;
+  letter-spacing: -0.2px;
+  margin: 0 0 2px;
+}
+
+.modal-subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.modal-divider { flex-shrink: 0; }
+
+.modal-section {
+  flex-shrink: 0;
+
+  &:last-child {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+  }
+}
+
+.form-input { flex: 1; min-width: 0; }
+
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.section-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--c-primary-subtle);
+  color: var(--c-primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.add-row {
+  display: flex;
+  gap: 8px;
+}
+
+.expiry-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.expiry-label { flex-shrink: 0; }
+
+.expiry-input { width: 140px; flex-shrink: 0; }
+
+.share-error {
+  color: var(--c-danger);
+  font-size: 12px;
+  margin: 8px 0 0;
+  animation: slideDown 0.15s ease both;
+}
+
+.shares-empty { margin: 0; }
+
+.shares-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.share-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--r-sm);
+  transition: background var(--t-fast);
+
+  &:hover { background: var(--c-surface-hover); }
+}
+
+.share-avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--c-primary-subtle);
+  color: var(--c-primary);
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--c-primary-border);
+}
+
+.share-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.share-email {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--c-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-date { font-size: 12px; }

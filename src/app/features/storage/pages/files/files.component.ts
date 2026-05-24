@@ -1,23 +1,25 @@
-import { DatePipe } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, NgZone, OnInit,
   computed, inject, signal, viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, Subscription, catchError, debounceTime, distinctUntilChanged, finalize, forkJoin, from, of, switchMap } from 'rxjs';
+import { DatePipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
+import { ActivatedRoute } from '@angular/router';
+import { Subject, Subscription, catchError, debounceTime, distinctUntilChanged, finalize, firstValueFrom, forkJoin, from, of, switchMap } from 'rxjs';
 
 import { AuthService } from '../../../../core/services/auth.service';
-import { ShareItem, SharingService } from '../../../../core/services/sharing.service';
 import { StorageUsageService } from '../../../../core/services/storage-usage.service';
 import { ToastService } from '../../../../core/services/toast.service';
 import { FileItem } from '../../models/file-item.model';
 import { BreadcrumbItem, FolderItem } from '../../models/folder.model';
 import { FilesService } from '../../services/files.service';
 import { FavoritesService } from '../../../favorites/services/favorites.service';
-import { shortMimeType } from '../../../../core/utils/browser.utils';
+import { formatSize, shortMimeType } from '../../../../core/utils/browser.utils';
 import { InputModalComponent } from '../../../../shared/components/input-modal/input-modal.component';
 import { FolderPickerComponent } from '../../../../shared/components/folder-picker/folder-picker.component';
+import { FileShareDialogComponent } from '../../components/file-share-dialog/file-share-dialog.component';
+import { FileUploadBarComponent } from '../../components/file-upload-bar/file-upload-bar.component';
 
 interface SearchResults {
   blobs: FileItem[];
@@ -25,24 +27,23 @@ interface SearchResults {
 }
 
 @Component({
-    selector: 'app-files',
-    imports: [DatePipe, InputModalComponent, FolderPickerComponent],
-    templateUrl: './files.component.html',
-    styleUrl: './files.component.scss',
-    changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-files',
+  imports: [DatePipe, InputModalComponent, FolderPickerComponent, FileShareDialogComponent, FileUploadBarComponent],
+  templateUrl: './files.component.html',
+  styleUrl: './files.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FilesComponent implements OnInit {
   private readonly filesService     = inject(FilesService);
-  private readonly sharingService   = inject(SharingService);
   private readonly favoritesService = inject(FavoritesService);
   private readonly auth             = inject(AuthService);
   private readonly usageSvc         = inject(StorageUsageService);
   private readonly destroyRef       = inject(DestroyRef);
   private readonly toast            = inject(ToastService);
   private readonly ngZone           = inject(NgZone);
+  private readonly route            = inject(ActivatedRoute);
 
-  private readonly fileInputRef       = viewChild<ElementRef<HTMLInputElement>>('fileInput');
-  private readonly shareEmailInputRef = viewChild<ElementRef<HTMLInputElement>>('shareEmailInput');
+  private readonly fileInputRef = viewChild<ElementRef<HTMLInputElement>>('fileInput');
 
   // ─── File state ───────────────────────────────────────────────────────────
 
@@ -133,7 +134,6 @@ export class FilesComponent implements OnInit {
   readonly hasFolders     = computed(() => this.folders().length > 0);
   readonly hasFiles       = computed(() => this.files().length > 0);
   readonly hasBreadcrumbs = computed(() => this.breadcrumbs().length > 1);
-  readonly hasShares      = computed(() => this.fileShares().length > 0);
   readonly hasResults     = computed(() => this.filteredFolders().length > 0 || this.filteredFiles().length > 0);
 
   // ─── Create folder ────────────────────────────────────────────────────────
@@ -170,19 +170,15 @@ export class FilesComponent implements OnInit {
 
   readonly openMenuId = signal<string | null>(null);
 
-  // ─── Folder download ──────────────────────────────────────────────────────
+  // ─── Download ─────────────────────────────────────────────────────────────
 
   readonly downloadingFolderId = signal<string | null>(null);
+  readonly downloadingBlobId   = signal<string | null>(null);
+  readonly downloadProgress    = signal(0);
 
   // ─── Sharing dialog ───────────────────────────────────────────────────────
 
-  readonly accessFile       = signal<FileItem | null>(null);
-  readonly fileShares       = signal<ShareItem[]>([]);
-  readonly isLoadingShares  = signal(false);
-  readonly shareEmail       = signal('');
-  readonly isSharing        = signal(false);
-  readonly shareError       = signal('');
-  readonly revokingId       = signal<string | null>(null);
+  readonly accessFile = signal<FileItem | null>(null);
 
   // ─── Load stream ──────────────────────────────────────────────────────────
 
@@ -235,6 +231,17 @@ export class FilesComponent implements OnInit {
       this.files.set(files);
       this.isLoading.set(false);
     });
+
+    const qp = this.route.snapshot.queryParamMap;
+    const folderId   = qp.get('folder');
+    const folderName = qp.get('folderName');
+    if (folderId) {
+      this.currentFolderId.set(folderId);
+      this.breadcrumbs.set([
+        { folder_id: null, name: 'Мои файлы' },
+        { folder_id: folderId, name: folderName ?? folderId },
+      ]);
+    }
 
     this.loadContent();
     this.loadFavorites();
@@ -445,10 +452,11 @@ export class FilesComponent implements OnInit {
     const blobId      = event.dataTransfer?.getData('blob-id')   ?? '';
     const srcFolderId = event.dataTransfer?.getData('folder-id') ?? '';
 
+    const destName = this.folders().find(f => f.folder_id === targetFolderId)?.name ?? 'Мой диск';
     if (blobId) {
-      this.moveBlobToFolder(blobId, targetFolderId);
+      this.moveBlobToFolder(blobId, targetFolderId, destName);
     } else if (srcFolderId && srcFolderId !== targetFolderId) {
-      this.moveFolderIntoFolder(srcFolderId, targetFolderId);
+      this.moveFolderIntoFolder(srcFolderId, targetFolderId, destName);
     }
   }
 
@@ -480,22 +488,23 @@ export class FilesComponent implements OnInit {
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: folders => this.pickerFolders.set(folders),
-      error: () => {},
+      error: () => this.toast.error('Не удалось загрузить папки.'),
     });
   }
 
   onMovePicked(folderId: string | null): void {
     const target = this.moveTarget();
     if (!target) return;
+    const destName = this.pickerBreadcrumbs().at(-1)?.name ?? 'Мой диск';
     this.moveTarget.set(null);
     if (target.type === 'file') {
-      this.moveBlobToFolder(target.id, folderId);
+      this.moveBlobToFolder(target.id, folderId, destName);
     } else {
-      this.moveFolderIntoFolder(target.id, folderId);
+      this.moveFolderIntoFolder(target.id, folderId, destName);
     }
   }
 
-  private moveBlobToFolder(blobId: string, targetFolderId: string | null): void {
+  private moveBlobToFolder(blobId: string, targetFolderId: string | null, destName: string): void {
     const sourceFolderId = this.currentFolderId();
     const file = this.files().find(f => f.blob_id === blobId);
     if (!file) return;
@@ -506,6 +515,7 @@ export class FilesComponent implements OnInit {
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: () => {
+        this.toast.success(`«${file.file_name}» перемещён в «${destName}».`);
         if (this.currentFolderId() === targetFolderId) {
           this.loadContent();
         }
@@ -519,7 +529,7 @@ export class FilesComponent implements OnInit {
     });
   }
 
-  private moveFolderIntoFolder(srcFolderId: string, targetFolderId: string | null): void {
+  private moveFolderIntoFolder(srcFolderId: string, targetFolderId: string | null, destName: string): void {
     const sourceFolderId = this.currentFolderId();
     const folder = this.folders().find(f => f.folder_id === srcFolderId);
     if (!folder) return;
@@ -530,6 +540,7 @@ export class FilesComponent implements OnInit {
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: () => {
+        this.toast.success(`«${folder.name}» перемещена в «${destName}».`);
         if (this.currentFolderId() === targetFolderId) {
           this.loadContent();
         }
@@ -600,7 +611,7 @@ export class FilesComponent implements OnInit {
         },
         error: (err: unknown) => {
           this.selectedFile.set(null);
-          if (this.isMasterKeyMissing(err)) {
+          if (this.isKekMissing(err)) {
             this.auth.clearAccess();
             this.toast.error('Сессия истекла — войдите снова.');
             return;
@@ -618,12 +629,22 @@ export class FilesComponent implements OnInit {
   // ─── File download / delete ───────────────────────────────────────────────
 
   download(file: FileItem): void {
-    this.filesService.downloadFile(file.blob_id, file.file_name).pipe(
+    if (this.downloadingBlobId()) return;
+    this.downloadingBlobId.set(file.blob_id);
+    this.downloadProgress.set(0);
+
+    this.filesService.downloadFile(file.blob_id, file.file_name, pct => {
+      this.ngZone.run(() => this.downloadProgress.set(pct));
+    }).pipe(
       takeUntilDestroyed(this.destroyRef),
+      finalize(() => {
+        this.downloadingBlobId.set(null);
+        this.downloadProgress.set(0);
+      }),
     ).subscribe({
       next: () => this.toast.success(`Файл «${file.file_name}» скачан.`),
       error: (err: unknown) => {
-        if (this.isMasterKeyMissing(err)) {
+        if (this.isKekMissing(err)) {
           this.auth.clearAccess();
           this.toast.error('Сессия истекла — войдите снова.');
           return;
@@ -664,7 +685,7 @@ export class FilesComponent implements OnInit {
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       error: (err: unknown) => {
-        if (err instanceof Error && err.message.startsWith('Master key')) {
+        if (this.isKekMissing(err)) {
           this.auth.clearAccess();
           this.toast.error('Сессия истекла — войдите снова.');
           return;
@@ -679,11 +700,7 @@ export class FilesComponent implements OnInit {
     const zip = new JSZip();
 
     await Promise.all(files.map(async file => {
-      const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-        this.filesService.downloadFileToBuffer(file.blob_id)
-          .pipe(takeUntilDestroyed(this.destroyRef))
-          .subscribe({ next: resolve, error: reject });
-      });
+      const buffer = await firstValueFrom(this.filesService.downloadFileToBuffer(file.blob_id));
       zip.file(file.file_name, buffer);
     }));
 
@@ -700,79 +717,10 @@ export class FilesComponent implements OnInit {
 
   openAccessDialog(file: FileItem): void {
     this.accessFile.set(file);
-    this.fileShares.set([]);
-    this.shareEmail.set('');
-    this.shareError.set('');
-    this.loadFileShares(file.blob_id);
-    setTimeout(() => this.shareEmailInputRef()?.nativeElement.focus());
   }
 
   closeAccessDialog(): void {
     this.accessFile.set(null);
-    this.fileShares.set([]);
-    this.shareEmail.set('');
-    this.shareError.set('');
-  }
-
-  private loadFileShares(blobId: string): void {
-    this.isLoadingShares.set(true);
-    this.sharingService.listMyShares(blobId).pipe(
-      finalize(() => this.isLoadingShares.set(false)),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: resp => this.fileShares.set(resp.items ?? []),
-      error: () => {},
-    });
-  }
-
-  submitShare(): void {
-    const file  = this.accessFile();
-    const email = this.shareEmail().trim().toLowerCase();
-    if (!file || !email) return;
-
-    this.isSharing.set(true);
-    this.shareError.set('');
-
-    this.sharingService.getRecipientPublicKey(email).pipe(
-      switchMap(publicKey =>
-        this.sharingService.shareFileWithUser(file.blob_id, file.encrypted_file_key, email, publicKey),
-      ),
-      finalize(() => this.isSharing.set(false)),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: () => {
-        this.shareEmail.set('');
-        this.loadFileShares(file.blob_id);
-      },
-      error: (err: unknown) => {
-        if (this.isMasterKeyMissing(err)) {
-          this.auth.clearAccess();
-          this.toast.error('Сессия истекла — войдите снова.');
-          this.closeAccessDialog();
-          return;
-        }
-        if (err instanceof HttpErrorResponse) {
-          if (err.status === 404)      this.shareError.set('Пользователь с таким email не найден.');
-          else if (err.status === 429) this.shareError.set('Слишком много запросов. Подождите.');
-          else if (err.status === 409) this.shareError.set('Вы уже открыли доступ этому пользователю.');
-          else if (err.status === 400) this.shareError.set('Нельзя открыть доступ самому себе.');
-          else                         this.shareError.set('Не удалось поделиться файлом.');
-        } else {
-          this.shareError.set('Не удалось поделиться файлом.');
-        }
-      },
-    });
-  }
-
-  revokeShare(shareId: string): void {
-    this.revokingId.set(shareId);
-    this.sharingService.revokeShare(shareId).pipe(
-      finalize(() => this.revokingId.set(null)),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: () => this.fileShares.update(list => list.filter(s => s.share_id !== shareId)),
-      error: () => this.shareError.set('Не удалось отозвать доступ.'),
-    });
   }
 
   // ─── Favorites ────────────────────────────────────────────────────────────
@@ -785,7 +733,7 @@ export class FilesComponent implements OnInit {
         this.favoriteBlobIds.set(new Set(blobs.map(b => b.blob_id)));
         this.favoriteFolderIds.set(new Set(folders.map(f => f.folder_id)));
       },
-      error: () => {},
+      error: () => this.toast.error('Не удалось загрузить избранное.'),
     });
   }
 
@@ -848,17 +796,10 @@ export class FilesComponent implements OnInit {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  formatSize(bytes: number): string {
-    if (bytes < 1024)             return `${bytes} B`;
-    if (bytes < 1024 * 1024)      return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
+  protected readonly formatSize = formatSize;
+  protected readonly shortType  = shortMimeType;
 
-  shortType(mime: string): string {
-    return shortMimeType(mime);
-  }
-
-  private isMasterKeyMissing(err: unknown): boolean {
-    return err instanceof Error && err.message.startsWith('Master key');
+  private isKekMissing(err: unknown): boolean {
+    return err instanceof Error && err.message.startsWith('KEK');
   }
 }

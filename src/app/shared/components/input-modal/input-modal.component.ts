@@ -2,28 +2,29 @@ import { ChangeDetectionStrategy, Component, ElementRef, afterNextRender, input,
 
 @Component({
   selector: 'app-input-modal',
-  standalone: true,
   templateUrl: './input-modal.component.html',
   styleUrl: './input-modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class InputModalComponent {
-  title        = input.required<string>();
-  subtitle     = input<string>();
-  placeholder  = input<string>('');
-  confirmLabel = input<string>('Подтвердить');
-  value        = model.required<string>();
-  error        = input<string>('');
-  loading      = input<boolean>(false);
+  readonly title        = input.required<string>();
+  readonly subtitle     = input<string>();
+  readonly placeholder  = input('');
+  readonly confirmLabel = input('Подтвердить');
+  readonly value        = model.required<string>();
+  readonly error        = input('');
+  readonly loading      = input(false);
 
-  confirmed = output<void>();
-  cancelled = output<void>();
+  readonly confirmed = output<void>();
+  readonly cancelled = output<void>();
 
   private readonly inputEl = viewChild.required<ElementRef<HTMLInputElement>>('inputEl');
 
   constructor() {
     afterNextRender(() => this.inputEl().nativeElement.focus());
   }
+
+  onInput(e: Event): void { this.value.set((e.target as HTMLInputElement).value); }
 
   onConfirm(): void {
     if (this.loading() || !this.value().trim()) return;
