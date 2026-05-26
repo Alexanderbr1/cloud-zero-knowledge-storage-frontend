@@ -749,6 +749,7 @@ export class FilesComponent implements OnInit {
       ? this.favoritesService.removeBlob(file.blob_id)
       : this.favoritesService.addBlob(file.blob_id);
     req.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => this.toast.success(wasStarred ? `«${file.file_name}» убран из избранного.` : `«${file.file_name}» добавлен в избранное.`),
       error: () => {
         this.favoriteBlobIds.update(s => {
           const prev = new Set(s);
@@ -772,6 +773,7 @@ export class FilesComponent implements OnInit {
       ? this.favoritesService.removeFolder(folder.folder_id)
       : this.favoritesService.addFolder(folder.folder_id);
     req.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => this.toast.success(wasStarred ? `«${folder.name}» убрана из избранного.` : `«${folder.name}» добавлена в избранное.`),
       error: () => {
         this.favoriteFolderIds.update(s => {
           const prev = new Set(s);

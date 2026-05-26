@@ -33,7 +33,6 @@ export class LayoutComponent implements OnInit {
   toggleUserMenu(e: MouseEvent): void {
     e.stopPropagation();
     this.isUserMenuOpen.update(v => !v);
-    this.isMenuOpen.set(false);
   }
 
   logout(): void {

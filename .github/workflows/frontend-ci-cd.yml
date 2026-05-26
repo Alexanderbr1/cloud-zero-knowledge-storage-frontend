@@ -17,6 +17,7 @@ on:
     paths:
       - "src/**"
       - "angular.json"
+      - "karma.conf.js"
       - "package.json"
       - "package-lock.json"
       - "tsconfig*.json"
@@ -28,6 +29,7 @@ on:
     paths:
       - "src/**"
       - "angular.json"
+      - "karma.conf.js"
       - "package.json"
       - "package-lock.json"
       - "tsconfig*.json"
@@ -39,7 +41,7 @@ concurrency:
 
 jobs:
   build:
-    name: Install & build
+    name: Install, test & build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,6 +53,9 @@ jobs:
 
       - name: npm ci
         run: npm ci
+
+      - name: ng test
+        run: npx ng test --watch=false --no-progress --browsers=ChromeHeadlessNoSandbox
 
       - name: ng build
         run: npm run build

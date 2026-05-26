@@ -26,8 +26,9 @@ const EVENT_LABELS: Record<string, string> = {
   file_renamed:           'Файл переименован',
   file_moved:             'Файл перемещён',
   folder_moved:           'Папка перемещена',
-  file_shared:            'Открыт доступ к файлу',
-  file_share_revoked:     'Доступ к файлу отозван',
+  file_shared:                  'Открыт доступ к файлу',
+  file_share_revoked:           'Доступ к файлу отозван',
+  file_downloaded_via_share:    'Файл скачан по ссылке доступа',
   folder_created:         'Папка создана',
   folder_deleted:         'Папка перемещена в корзину',
   folder_hard_deleted:    'Папка удалена навсегда',
@@ -49,8 +50,9 @@ const EVENT_ICON_CLASS: Record<string, string> = {
   file_hard_deleted:      'event-icon--danger',
   file_renamed:           'event-icon--neutral',
   file_moved:             'event-icon--neutral',
-  file_shared:            'event-icon--info',
-  file_share_revoked:     'event-icon--warn',
+  file_shared:                  'event-icon--info',
+  file_share_revoked:           'event-icon--warn',
+  file_downloaded_via_share:    'event-icon--info',
   folder_created:         'event-icon--success',
   folder_deleted:         'event-icon--warn',
   folder_hard_deleted:    'event-icon--danger',
@@ -72,7 +74,7 @@ function resolveIconType(type: string): IconType {
   if (type === 'file_deleted'   || type === 'file_hard_deleted') return 'trash';
   if (type === 'folder_deleted' || type === 'folder_hard_deleted') return 'trash';
   if (type === 'file_restored'  || type === 'folder_restored')   return 'restore';
-  if (type === 'file_shared'    || type === 'file_share_revoked') return 'share';
+  if (type === 'file_shared' || type === 'file_share_revoked' || type === 'file_downloaded_via_share') return 'share';
   if (type.startsWith('file_')) return 'file';
   return 'folder';
 }

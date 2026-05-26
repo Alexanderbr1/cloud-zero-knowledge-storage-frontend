@@ -356,15 +356,25 @@ export class AuthService {
     const newCryptoSalt = this.crypto.generateSalt();
     const newMasterKey  = await this.crypto.deriveMasterKey(newPassword, newCryptoSalt);
 
+    // Rotate recovery phrase — old phrase becomes invalid after this (Dashlane single-use model).
+    const newRecoveryPhrase = this.crypto.generateRecoveryPhrase();
+    const newRecoverySalt   = this.crypto.generateSalt();
+    const newRecoveryKey    = await this.crypto.deriveRecoveryKey(newRecoveryPhrase, newRecoverySalt);
+
     await firstValueFrom(
       this.http.post<void>(`${this.baseUrl}/reset-password/confirm`, {
         token,
-        srp_salt:             srpSalt,
-        srp_verifier:         srpVerifier,
-        bcrypt_salt:          bcryptSalt,
-        crypto_salt:          toBase64(newCryptoSalt),
-        kek_encrypted_master: await this.crypto.wrapKEK(kek, newMasterKey),
+        srp_salt:               srpSalt,
+        srp_verifier:           srpVerifier,
+        bcrypt_salt:            bcryptSalt,
+        crypto_salt:            toBase64(newCryptoSalt),
+        kek_encrypted_master:   await this.crypto.wrapKEK(kek, newMasterKey),
+        kek_encrypted_recovery: await this.crypto.wrapKEK(kek, newRecoveryKey),
+        recovery_salt:          toBase64(newRecoverySalt),
       })
     );
+
+    // Store new phrase for one-time display — consumed by the component immediately after navigation.
+    this.pendingRecoveryPhrase = newRecoveryPhrase;
   }
 }

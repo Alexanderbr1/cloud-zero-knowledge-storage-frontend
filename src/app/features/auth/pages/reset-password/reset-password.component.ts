@@ -32,6 +32,7 @@ export class ResetPasswordComponent {
   readonly errorMessage = signal('');
   readonly done         = signal(false);
   readonly tokenMissing = signal(!this.token);
+  readonly newPhrase    = signal<string | null>(null);
 
   readonly strengthSegs = [0, 1, 2, 3] as const;
 
@@ -69,7 +70,10 @@ export class ResetPasswordComponent {
     this.auth.resetPassword(this.token, recoveryPhrase!.trim(), newPassword!).pipe(
       finalize(() => this.isSubmitting.set(false)),
     ).subscribe({
-      next: () => this.done.set(true),
+      next: () => {
+        this.newPhrase.set(this.auth.consumeRecoveryPhrase());
+        this.done.set(true);
+      },
       error: (err: unknown) => {
         if (err instanceof HttpErrorResponse) {
           this.errorMessage.set(
