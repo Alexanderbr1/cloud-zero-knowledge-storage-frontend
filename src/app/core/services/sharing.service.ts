@@ -20,15 +20,18 @@ export interface ShareItem {
   readonly expires_at?:    string;
   readonly created_at:     string;
   readonly download_url?:  string;
-  readonly file_iv?:       string;
+  readonly file_size?:     number;
+  readonly file_size_plain?: number;
+  readonly chunk_size?:    number;
 }
 
 interface SharedFileResult {
-  downloadUrl:  string;
-  fileKey:      CryptoKey;
-  fileIVb64:    string;
-  fileName:     string;
-  ownerUserId:  string;
+  downloadUrl:   string;
+  fileKey:       CryptoKey;
+  chunkSize:     number;
+  fileSize:      number;
+  fileName:      string;
+  ownerUserId:   string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -88,11 +91,14 @@ export class SharingService {
 
     return from((async (): Promise<SharedFileResult> => {
       const share = await firstValueFrom(this.http.get<ShareItem>(`${this.sharesBase}/${shareId}`));
-      if (!share.download_url || !share.file_iv) throw new Error('Server returned share without download data');
+      if (!share.download_url || !share.chunk_size || !share.file_size) {
+        throw new Error('Server returned share without download data');
+      }
       return {
         downloadUrl:  share.download_url,
         fileKey:      await this.crypto.decryptFileKeyFromShare(share.wrapped_file_key, share.ephemeral_pub, ecPrivateKey),
-        fileIVb64:    share.file_iv,
+        chunkSize:    share.chunk_size,
+        fileSize:     share.file_size,
         fileName:     share.file_name,
         ownerUserId:  share.owner_id,
       };
@@ -113,7 +119,7 @@ export class SharingService {
     const resp = await fetch(result.downloadUrl);
     if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
     const aad       = result.ownerUserId ? new TextEncoder().encode(result.ownerUserId) : undefined;
-    const plaintext = await this.crypto.decryptFile(await resp.arrayBuffer(), result.fileKey, result.fileIVb64, aad);
+    const plaintext = await this.crypto.decryptFileChunked(await resp.arrayBuffer(), result.fileKey, result.chunkSize, aad);
     triggerBrowserDownload(plaintext, result.fileName, contentType);
   }
 }

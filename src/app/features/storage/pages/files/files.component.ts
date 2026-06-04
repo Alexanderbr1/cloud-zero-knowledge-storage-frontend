@@ -9,6 +9,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Subject, Subscription, catchError, debounceTime, distinctUntilChanged, finalize, firstValueFrom, forkJoin, from, of, switchMap } from 'rxjs';
 
 import { AuthService } from '../../../../core/services/auth.service';
+import { DownloadService } from '../../../../core/services/download.service';
 import { StorageUsageService } from '../../../../core/services/storage-usage.service';
 import { ToastService } from '../../../../core/services/toast.service';
 import { FileItem } from '../../models/file-item.model';
@@ -37,6 +38,7 @@ export class FilesComponent implements OnInit {
   private readonly filesService     = inject(FilesService);
   private readonly favoritesService = inject(FavoritesService);
   private readonly auth             = inject(AuthService);
+  private readonly downloadService  = inject(DownloadService);
   private readonly usageSvc         = inject(StorageUsageService);
   private readonly destroyRef       = inject(DestroyRef);
   private readonly toast            = inject(ToastService);
@@ -633,9 +635,7 @@ export class FilesComponent implements OnInit {
     this.downloadingBlobId.set(file.blob_id);
     this.downloadProgress.set(0);
 
-    this.filesService.downloadFile(file.blob_id, file.file_name, pct => {
-      this.ngZone.run(() => this.downloadProgress.set(pct));
-    }).pipe(
+    from(this.downloadService.download(file.blob_id, file.file_name)).pipe(
       takeUntilDestroyed(this.destroyRef),
       finalize(() => {
         this.downloadingBlobId.set(null);

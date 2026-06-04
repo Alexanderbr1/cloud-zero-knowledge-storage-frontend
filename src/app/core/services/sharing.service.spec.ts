@@ -227,7 +227,8 @@ describe('SharingService', () => {
     req.flush({
       ...SHARE_ITEM,
       download_url: 'https://s3.example.com/blob-1',
-      file_iv: 'iv==',
+      chunk_size: 8388608,
+      file_size: 8388636,
     });
     tick();
 
