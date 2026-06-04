@@ -2,9 +2,9 @@
 //
 // Flow:
 //  1. Main thread stores download metadata in window.__swDownloads (Map keyed by ID).
-//  2. Main thread navigates to /sw-download/{id}/{filename}.
+//  2. Main thread opens save dialog, then fetches /sw-download/{id}/{filename}.
 //  3. SW intercepts the request, asks the controlling client for metadata via
-//     MessageChannel, then streams decrypted chunks back as a Response.
+//     MessageChannel, then streams decrypted chunks back as a pull-based Response.
 //
 // Frame format: [12 bytes IV][AES-256-GCM ciphertext + 16 bytes tag]
 
@@ -27,7 +27,6 @@ self.addEventListener('fetch', event => {
 });
 
 async function handleDownload(downloadId, filename) {
-  // Ask the controlling window for download metadata.
   const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
   let meta = null;
 
@@ -47,7 +46,7 @@ async function handleDownload(downloadId, filename) {
   }
 
   const { downloadUrl, rawKey, chunkSize, fileSize, contentType, ownerUserId } = meta;
-  const aad = ownerUserId ? new TextEncoder().encode(ownerUserId) : null;
+  const aad       = ownerUserId ? new TextEncoder().encode(ownerUserId) : null;
   const frameSize  = chunkSize + FRAME_OVERHEAD;
   const chunkCount = Math.ceil(fileSize / frameSize);
   const plainSize  = fileSize - chunkCount * FRAME_OVERHEAD;
@@ -63,31 +62,36 @@ async function handleDownload(downloadId, filename) {
     return new Response('Failed to import file key', { status: 500 });
   }
 
+  // Pull-based: a chunk is downloaded and decrypted only when the consumer
+  // (pipeTo writable) is ready to accept it — one chunk in memory at a time.
+  let nextChunk = 0;
   const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        for (let i = 0; i < chunkCount; i++) {
-          const frameStart = i * frameSize;
-          const frameEnd   = Math.min(frameStart + frameSize - 1, fileSize - 1);
-
-          const resp = await fetch(downloadUrl, {
-            headers: { Range: `bytes=${frameStart}-${frameEnd}` },
-          });
-          if (!resp.ok && resp.status !== 206) {
-            throw new Error(`S3 range fetch failed: ${resp.status}`);
-          }
-
-          const frameBuf = await resp.arrayBuffer();
-          const iv       = frameBuf.slice(0, 12);
-          const ct       = frameBuf.slice(12);
-          const plain    = await crypto.subtle.decrypt(
-            { name: 'AES-GCM', iv: new Uint8Array(iv), ...(aad ? { additionalData: aad } : {}) },
-            fileKey,
-            ct,
-          );
-          controller.enqueue(new Uint8Array(plain));
-        }
+    async pull(controller) {
+      if (nextChunk >= chunkCount) {
         controller.close();
+        return;
+      }
+      const i          = nextChunk++;
+      const frameStart = i * frameSize;
+      const frameEnd   = Math.min(frameStart + frameSize - 1, fileSize - 1);
+
+      try {
+        const resp = await fetch(downloadUrl, {
+          headers: { Range: `bytes=${frameStart}-${frameEnd}` },
+        });
+        if (!resp.ok && resp.status !== 206) {
+          throw new Error(`S3 range fetch failed: ${resp.status}`);
+        }
+
+        const frameBuf = await resp.arrayBuffer();
+        const iv       = frameBuf.slice(0, 12);
+        const ct       = frameBuf.slice(12);
+        const plain    = await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: new Uint8Array(iv), ...(aad ? { additionalData: aad } : {}) },
+          fileKey,
+          ct,
+        );
+        controller.enqueue(new Uint8Array(plain));
       } catch (err) {
         controller.error(err);
       }

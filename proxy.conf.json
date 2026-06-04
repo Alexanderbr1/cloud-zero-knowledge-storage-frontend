@@ -7,6 +7,11 @@
     "pathRewrite": {
       "^/api": "/v1"
     }
+  },
+  "/blobs": {
+    "target": "http://localhost:9000",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "info"
   }
 }
-

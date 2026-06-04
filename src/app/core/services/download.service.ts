@@ -40,6 +40,17 @@ export class DownloadService {
     if (!('serviceWorker' in navigator)) return;
     try {
       await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+
+      // register() resolves when the SW is installed, but the SW may not yet
+      // control this page (clients.claim() runs asynchronously in activate).
+      // Wait for it to take control before marking as ready — otherwise the
+      // first download click goes to the server instead of the SW.
+      if (!navigator.serviceWorker.controller) {
+        await new Promise<void>(resolve => {
+          navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true });
+        });
+      }
+
       this.swRegistered = true;
       navigator.serviceWorker.addEventListener('message', event => {
         if (event.data?.type === 'GET_SW_DOWNLOAD') {
@@ -53,8 +64,6 @@ export class DownloadService {
     }
   }
 
-  // Streaming download for chunked files via Service Worker.
-  // Falls back to legacy ArrayBuffer download if SW is not available or file is legacy.
   async download(blobId: string, fileName: string): Promise<void> {
     const kek = this.auth.getFileKey();
     if (!kek) throw new Error('KEK not available. Please log in again.');
@@ -65,7 +74,6 @@ export class DownloadService {
       )
     );
 
-    // Chunked + SW available → stream directly to disk, no full buffer in memory.
     if (this.swRegistered) {
       const fileKey    = await this.crypto.unwrapFileKeyRaw(resp.encrypted_file_key, kek);
       const downloadId = crypto.randomUUID();
@@ -80,13 +88,29 @@ export class DownloadService {
         ownerUserId:  this.auth.userId() ?? '',
       });
 
-      const a        = document.createElement('a');
-      a.href         = `/sw-download/${downloadId}/${encodeURIComponent(fileName)}`;
-      a.download     = fileName;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const swUrl = `/sw-download/${downloadId}/${encodeURIComponent(fileName)}`;
+
+      if ('showSaveFilePicker' in window) {
+        // Open the save dialog first (user gesture still active), then start
+        // the SW fetch. The pull-based SW stream downloads one chunk at a time
+        // as pipeTo consumes it — peak RAM ≈ one chunk (~8 MiB).
+        const handle   = await (window as any).showSaveFilePicker({ suggestedName: fileName });
+        const writable = await handle.createWritable();
+        const swResp   = await fetch(swUrl);
+        if (!swResp.ok || !swResp.body) throw new Error(`SW returned ${swResp.status}`);
+        await swResp.body.pipeTo(writable);
+      } else {
+        // Fallback for browsers without File System Access API (Firefox, Safari).
+        const swResp = await fetch(swUrl);
+        if (!swResp.ok || !swResp.body) throw new Error(`SW returned ${swResp.status}`);
+        const blob = await swResp.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = fileName;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      }
       return;
     }
 
