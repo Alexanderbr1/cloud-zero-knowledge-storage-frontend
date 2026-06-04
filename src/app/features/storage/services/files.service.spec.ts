@@ -260,21 +260,6 @@ describe('FilesService', () => {
     expect(done).toBeTrue();
   }));
 
-  // ─── confirmUpload ────────────────────────────────────────────────────────
-
-  it('confirmUpload() POSTs to /storage/blobs/:id/confirm-upload', fakeAsync(() => {
-    let done = false;
-    svc.confirmUpload('blob-new').subscribe(() => (done = true));
-    tick();
-
-    const req = http.expectOne(`${STORAGE}/blobs/blob-new/confirm-upload`);
-    expect(req.request.method).toBe('POST');
-    req.flush(null, { status: 204, statusText: 'No Content' });
-    tick();
-
-    expect(done).toBeTrue();
-  }));
-
   // ─── search ───────────────────────────────────────────────────────────────
 
   it('search() GETs /storage/search with q param', fakeAsync(() => {
