@@ -18,6 +18,8 @@ const TEST_FILE: FileItem = {
   file_name:          'report.pdf',
   content_type:       'application/pdf',
   file_size:          1024,
+  file_size_plain:    1024,
+  chunk_size:         1024,
   created_at:         '2025-01-01T00:00:00Z',
   encrypted_file_key: 'efk==',
 };

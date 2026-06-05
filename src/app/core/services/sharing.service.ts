@@ -94,6 +94,7 @@ export class SharingService {
 
     return from((async (): Promise<SharedFileResult> => {
       const share = await firstValueFrom(this.http.get<SharedFileItem>(`${this.sharesBase}/${shareId}`));
+      if (!share.download_url) throw new Error('Missing download data');
       return {
         downloadUrl:  share.download_url,
         fileKey:      await this.crypto.decryptFileKeyFromShare(share.wrapped_file_key, share.ephemeral_pub, ecPrivateKey),

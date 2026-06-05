@@ -16,7 +16,7 @@ import { FolderItem } from '../../../storage/models/folder.model';
 
 const FILE: FileItem = {
   blob_id: 'blob-1', folder_id: null, file_name: 'photo.jpg',
-  content_type: 'image/jpeg', file_size: 1024,
+  content_type: 'image/jpeg', file_size: 1024, file_size_plain: 1024, chunk_size: 1024,
   created_at: '2025-01-01T00:00:00Z', encrypted_file_key: 'key==',
 };
 

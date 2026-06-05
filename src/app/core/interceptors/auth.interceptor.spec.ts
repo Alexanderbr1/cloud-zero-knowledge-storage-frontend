@@ -9,6 +9,7 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 
 import { authInterceptor } from './auth.interceptor';
@@ -35,6 +36,7 @@ function setup(mockAuth: ReturnType<typeof makeMockAuth>) {
     providers: [
       provideHttpClient(withInterceptors([authInterceptor])),
       provideHttpClientTesting(),
+      provideRouter([{ path: '**', redirectTo: '' }]),
       { provide: AuthService, useValue: mockAuth },
     ],
   });

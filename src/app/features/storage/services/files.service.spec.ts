@@ -33,6 +33,8 @@ const FILE: FileItem = {
   file_name: 'doc.pdf',
   content_type: 'application/pdf',
   file_size: 2048,
+  file_size_plain: 2048,
+  chunk_size: 1024,
   created_at: '2025-01-01T00:00:00Z',
   encrypted_file_key: 'key==',
 };

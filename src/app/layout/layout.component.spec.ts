@@ -12,8 +12,9 @@ import { StorageUsageService } from '../core/services/storage-usage.service';
 function makeAuthStub(email: string | null = 'alice@example.com') {
   const emailSig = () => email;
   return {
-    email:   emailSig,
-    logout:  jasmine.createSpy('logout'),
+    email:          emailSig,
+    logout:         jasmine.createSpy('logout'),
+    recoveryPhrase: () => null,
   };
 }
 
@@ -40,7 +41,7 @@ describe('LayoutComponent', () => {
     await TestBed.configureTestingModule({
       imports: [LayoutComponent],
       providers: [
-        provideRouter([]),
+        provideRouter([{ path: '**', redirectTo: '' }]),
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: AuthService,         useValue: authStub  },
