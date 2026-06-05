@@ -250,7 +250,6 @@ describe('SharingService', () => {
     http.expectOne(`${SHARES}/share-1`).flush({
       ...SHARE_ITEM,
       download_url: undefined,
-      file_iv: undefined,
     });
     tick();
 

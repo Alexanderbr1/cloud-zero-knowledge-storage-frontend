@@ -35,7 +35,6 @@ const FILE: FileItem = {
   file_size: 2048,
   created_at: '2025-01-01T00:00:00Z',
   encrypted_file_key: 'key==',
-  file_iv: 'iv==',
 };
 
 const FOLDER: FolderItem = {
@@ -308,8 +307,7 @@ describe('FilesService', () => {
       http_method: 'GET',
       content_type: 'application/pdf',
       encrypted_file_key: 'key==',
-      file_iv: 'iv==',
-    });
+        });
     tick(); // runs the promise (fetchAndDecrypt), which throws immediately on missing KEK
 
     expect(error).toBeInstanceOf(Error);

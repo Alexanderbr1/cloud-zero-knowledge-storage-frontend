@@ -20,7 +20,6 @@ const TEST_FILE: FileItem = {
   file_size:          1024,
   created_at:         '2025-01-01T00:00:00Z',
   encrypted_file_key: 'efk==',
-  file_iv:            'iv==',
 };
 
 const SHARE_A: ShareItem = {

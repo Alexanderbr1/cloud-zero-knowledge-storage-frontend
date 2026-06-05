@@ -18,7 +18,6 @@ const BLOB: import('../../storage/models/file-item.model').FileItem = {
   file_size: 1024,
   created_at: '2025-01-01T00:00:00Z',
   encrypted_file_key: 'key==',
-  file_iv: 'iv==',
 };
 
 const FOLDER: import('../../storage/models/folder.model').FolderItem = {
