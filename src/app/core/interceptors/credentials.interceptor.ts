@@ -2,17 +2,15 @@ import { HttpInterceptorFn } from '@angular/common/http';
 
 import { environment } from '../../../environments/environment';
 
-/**
- * Запросы к API с относительным базовым путём — с куками (refresh в HttpOnly).
- * Прокси ng serve сохраняет Set-Cookie для того же origin, что и страница.
- */
+try { localStorage.removeItem('device_id'); } catch { /* ignore */ }
+
 export const credentialsInterceptor: HttpInterceptorFn = (req, next) => {
   const base = environment.apiBaseUrl;
-  if (!base || base === '/') {
-    return next(req.clone({ withCredentials: true }));
+  const isApiRequest = !base || base === '/' || req.url === base || req.url.startsWith(`${base}/`);
+
+  if (!isApiRequest) {
+    return next(req);
   }
-  if (req.url === base || req.url.startsWith(`${base}/`)) {
-    return next(req.clone({ withCredentials: true }));
-  }
-  return next(req);
+
+  return next(req.clone({ withCredentials: true }));
 };

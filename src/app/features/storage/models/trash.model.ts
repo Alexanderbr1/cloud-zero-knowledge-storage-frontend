@@ -4,9 +4,10 @@ export interface TrashFileItem {
   readonly file_name:          string;
   readonly content_type:       string;
   readonly file_size:          number;
+  readonly file_size_plain:    number;
+  readonly chunk_size:         number;
   readonly created_at:         string;
   readonly encrypted_file_key: string;
-  readonly file_iv:            string;
 }
 
 export interface TrashFolderItem {

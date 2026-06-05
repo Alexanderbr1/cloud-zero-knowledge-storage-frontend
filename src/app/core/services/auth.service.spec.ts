@@ -87,17 +87,16 @@ describe('AuthService', () => {
     void done;
   }));
 
-  // ─── consumeRecoveryPhrase ────────────────────────────────────────────────
+  // ─── recoveryPhrase signal ────────────────────────────────────────────────
 
-  it('consumeRecoveryPhrase() returns null when no phrase is pending', () => {
-    expect(svc.consumeRecoveryPhrase()).toBeNull();
+  it('recoveryPhrase is null by default', () => {
+    expect(svc.recoveryPhrase()).toBeNull();
   });
 
-  it('consumeRecoveryPhrase() is one-shot: second call returns null', () => {
-    // Access the private field via bracket notation for testing purposes.
-    (svc as unknown as { pendingRecoveryPhrase: string }).pendingRecoveryPhrase = 'word1 word2';
-    expect(svc.consumeRecoveryPhrase()).toBe('word1 word2');
-    expect(svc.consumeRecoveryPhrase()).toBeNull();
+  it('clearRecoveryPhrase() sets recoveryPhrase to null', () => {
+    (svc as any)._recoveryPhrase.set('word1 word2');
+    svc.clearRecoveryPhrase();
+    expect(svc.recoveryPhrase()).toBeNull();
   });
 
   // ─── tryRestoreSession ────────────────────────────────────────────────────

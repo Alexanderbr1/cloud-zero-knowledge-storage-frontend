@@ -396,3 +396,61 @@
 
   &--warn { background: #f59e0b; }
 }
+
+/* ─── Recovery phrase modal ───────────────────────────────────────────────── */
+.recovery-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  z-index: 500;
+}
+
+.recovery-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg);
+  padding: 36px 32px 28px;
+  max-width: 460px;
+  width: 100%;
+  text-align: center;
+  animation: scaleIn 0.28s var(--t-spring) both;
+}
+
+.recovery-icon { margin-bottom: 16px; }
+
+.recovery-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--c-text);
+  margin-bottom: 10px;
+  letter-spacing: -0.3px;
+}
+
+.recovery-desc {
+  font-size: 14px;
+  color: var(--c-text-secondary);
+  line-height: 1.55;
+  margin-bottom: 20px;
+}
+
+.recovery-phrase {
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  padding: 16px 20px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--c-text);
+  word-break: break-word;
+  margin-bottom: 24px;
+  letter-spacing: 0.02em;
+}
+
+.recovery-confirm { width: 100%; }

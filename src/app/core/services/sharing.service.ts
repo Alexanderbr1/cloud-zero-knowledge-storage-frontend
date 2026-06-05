@@ -8,21 +8,24 @@ import { AuthService } from './auth.service';
 import { CryptoService } from './crypto.service';
 
 export interface ShareItem {
-  readonly share_id:       string;
-  readonly blob_id:        string;
-  readonly owner_id:       string;
-  readonly owner_email:    string;
-  readonly recipient_email?: string;
-  readonly file_name:      string;
-  readonly content_type:   string;
-  readonly ephemeral_pub:  string;
+  readonly share_id:         string;
+  readonly blob_id:          string;
+  readonly owner_id:         string;
+  readonly owner_email:      string;
+  readonly recipient_email:  string;
+  readonly file_name:        string;
+  readonly content_type:     string;
+  readonly ephemeral_pub:    string;
   readonly wrapped_file_key: string;
-  readonly expires_at?:    string;
-  readonly created_at:     string;
-  readonly download_url?:  string;
-  readonly file_size?:     number;
-  readonly file_size_plain?: number;
-  readonly chunk_size?:    number;
+  readonly expires_at?:      string;
+  readonly created_at:       string;
+}
+
+interface SharedFileItem extends ShareItem {
+  readonly download_url:    string;
+  readonly file_size:       number;
+  readonly file_size_plain: number;
+  readonly chunk_size:      number;
 }
 
 interface SharedFileResult {
@@ -90,10 +93,7 @@ export class SharingService {
     if (!ecPrivateKey) return throwError(() => new Error('EC private key unavailable — please log in again.'));
 
     return from((async (): Promise<SharedFileResult> => {
-      const share = await firstValueFrom(this.http.get<ShareItem>(`${this.sharesBase}/${shareId}`));
-      if (!share.download_url || !share.chunk_size || !share.file_size) {
-        throw new Error('Server returned share without download data');
-      }
+      const share = await firstValueFrom(this.http.get<SharedFileItem>(`${this.sharesBase}/${shareId}`));
       return {
         downloadUrl:  share.download_url,
         fileKey:      await this.crypto.decryptFileKeyFromShare(share.wrapped_file_key, share.ephemeral_pub, ecPrivateKey),

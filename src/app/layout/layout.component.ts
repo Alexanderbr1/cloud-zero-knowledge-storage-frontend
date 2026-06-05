@@ -13,7 +13,7 @@ import { StorageUsageService } from '../core/services/storage-usage.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LayoutComponent implements OnInit {
-  private readonly auth     = inject(AuthService);
+  protected readonly auth   = inject(AuthService);
   private readonly router   = inject(Router);
   private readonly usageSvc = inject(StorageUsageService);
 
@@ -37,7 +37,7 @@ export class LayoutComponent implements OnInit {
 
   logout(): void {
     this.auth.logout();
-    this.router.navigate(['/']);
+    this.router.navigate(['/auth/login']);
   }
 
   @HostListener('document:click')
@@ -47,6 +47,10 @@ export class LayoutComponent implements OnInit {
   onEscape(): void {
     this.closeMenu();
     this.isUserMenuOpen.set(false);
+  }
+
+  closeRecovery(): void {
+    this.auth.clearRecoveryPhrase();
   }
 
   protected formatBytes(bytes: number): string {

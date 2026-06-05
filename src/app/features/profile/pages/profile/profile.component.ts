@@ -67,6 +67,6 @@ export class ProfileComponent implements OnInit {
 
   logout(): void {
     this.auth.logout();
-    this.router.navigate(['/']);
+    this.router.navigate(['/auth/login']);
   }
 }

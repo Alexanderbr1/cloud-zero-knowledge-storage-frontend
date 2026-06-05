@@ -123,7 +123,7 @@ export class FilesComponent implements OnInit {
       switch (field) {
         case 'name': return dir * a.file_name.localeCompare(b.file_name);
         case 'date': return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        case 'size': return dir * (a.file_size - b.file_size);
+        case 'size': return dir * (a.file_size_plain - b.file_size_plain);
         case 'type': return dir * a.content_type.localeCompare(b.content_type);
       }
     });
@@ -635,7 +635,9 @@ export class FilesComponent implements OnInit {
     this.downloadingBlobId.set(file.blob_id);
     this.downloadProgress.set(0);
 
-    from(this.downloadService.download(file.blob_id, file.file_name)).pipe(
+    from(this.downloadService.download(file.blob_id, file.file_name, pct => {
+      this.ngZone.run(() => this.downloadProgress.set(pct));
+    })).pipe(
       takeUntilDestroyed(this.destroyRef),
       finalize(() => {
         this.downloadingBlobId.set(null);
@@ -659,8 +661,8 @@ export class FilesComponent implements OnInit {
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: () => {
+        this.files.update(list => list.filter(f => f.blob_id !== file.blob_id));
         this.toast.success(`Файл «${file.file_name}» удалён.`);
-        this.loadContent();
       },
       error: () => this.toast.error(`Не удалось удалить «${file.file_name}».`),
     });
@@ -672,6 +674,7 @@ export class FilesComponent implements OnInit {
     event.stopPropagation();
     if (this.downloadingFolderId()) return;
     this.downloadingFolderId.set(folder.folder_id);
+    this.downloadProgress.set(0);
 
     this.filesService.listFilesInFolder(folder.folder_id).pipe(
       switchMap(files => {
@@ -679,11 +682,23 @@ export class FilesComponent implements OnInit {
           this.toast.error(`Папка «${folder.name}» пуста.`);
           return of(null);
         }
+        if (this.downloadService.swAvailable) {
+          // Service Worker path: one file at a time, peak RAM ≈ one chunk (~8 MiB).
+          return from(this.downloadService.downloadFolder(
+            files, folder.name,
+            pct => this.ngZone.run(() => this.downloadProgress.set(pct)),
+          ));
+        }
+        // Fallback: JSZip in memory (all files simultaneously).
         return from(this.buildZip(files, folder.name));
       }),
-      finalize(() => this.downloadingFolderId.set(null)),
+      finalize(() => {
+        this.downloadingFolderId.set(null);
+        this.downloadProgress.set(0);
+      }),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
+      next: () => this.toast.success(`Папка «${folder.name}» скачана.`),
       error: (err: unknown) => {
         if (this.isKekMissing(err)) {
           this.auth.clearAccess();

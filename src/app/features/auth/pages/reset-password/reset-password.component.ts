@@ -71,7 +71,8 @@ export class ResetPasswordComponent {
       finalize(() => this.isSubmitting.set(false)),
     ).subscribe({
       next: () => {
-        this.newPhrase.set(this.auth.consumeRecoveryPhrase());
+        this.newPhrase.set(this.auth.recoveryPhrase());
+        this.auth.clearRecoveryPhrase();
         this.done.set(true);
       },
       error: (err: unknown) => {

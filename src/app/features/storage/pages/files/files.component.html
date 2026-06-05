@@ -1,5 +1,7 @@
 <div class="page-container">
 
+  <div class="sticky-chrome">
+
   <div class="page-header">
     <h1 class="page-title">Мой диск</h1>
     <div class="page-header__actions">
@@ -61,6 +63,8 @@
       </button>
     }
   </div>
+
+  </div><!-- /.sticky-chrome -->
 
   @if (hasBreadcrumbs()) {
     <nav class="breadcrumb" aria-label="Навигация по папкам">
@@ -374,7 +378,7 @@
                   </svg>
                 </div>
                 <div class="file-name-wrap">
-                  <span class="file-name" [attr.title]="file.file_name">{{ file.file_name || file.object_key }}</span>
+                  <span class="file-name" [attr.title]="file.file_name">{{ file.file_name }}</span>
                   @if (file.folder_name) {
                     <span class="file-location text-muted">
                       <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
@@ -387,7 +391,7 @@
                 </div>
               </div>
               <span class="col-type text-secondary text-sm">{{ shortType(file.content_type) }}</span>
-              <span class="col-size text-secondary text-sm">{{ formatSize(file.file_size) }}</span>
+              <span class="col-size text-secondary text-sm">{{ formatSize(file.file_size_plain) }}</span>
               <span class="col-date text-secondary text-sm">{{ file.created_at | date: 'dd.MM.yyyy' }}</span>
               <div class="col-actions" [class.col-actions--open]="openMenuId() === file.blob_id" (click)="$event.stopPropagation()">
                 <button

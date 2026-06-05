@@ -1,4 +1,16 @@
-:host { display: flex; flex-direction: column; flex: 1; }
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  // sticky-chrome height (page-title area)
+  --sticky-chrome-h: 89px;
+  // card-header height: padding-top(20) + h2(21) + gap(2) + p(18) + padding-bottom(16) + border(1)
+  --card-header-h: 78px;
+
+  @media (max-width: 768px) {
+    --sticky-chrome-h: 133px;
+  }
+}
 
 .page-container { flex: 1; display: flex; flex-direction: column; }
 
@@ -7,12 +19,16 @@
   flex: 1;
   margin-top: 16px;
   padding: 0;
-  overflow: hidden;
+  overflow: clip; // clip = visual clipping without creating a scroll container
   display: flex;
   flex-direction: column;
 }
 
 .card-header {
+  position: sticky;
+  top: var(--sticky-chrome-h);
+  z-index: 8;
+  background: var(--c-surface);
   padding: 20px 24px 16px;
   border-bottom: 1px solid var(--c-border);
 }
@@ -51,6 +67,10 @@
 
 /* ─── Filter toolbar ──────────────────────────────────────────────────────── */
 .filter-toolbar {
+  position: sticky;
+  top: calc(var(--sticky-chrome-h) + var(--card-header-h));
+  z-index: 8;
+  background: var(--c-surface);
   display: flex;
   flex-direction: column;
   gap: 8px;

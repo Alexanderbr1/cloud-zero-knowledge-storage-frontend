@@ -388,6 +388,28 @@ input, textarea { font-family: inherit; }
   margin-bottom: 24px;
 }
 
+// Sticky page chrome — wraps page-header (+ any page-specific controls like search).
+// Uses the negative-margin trick to extend the background flush with the page edges,
+// and margin-top: -32px to make it stick immediately without a 32px dead-scroll zone.
+.sticky-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--c-bg);
+  margin-left: calc(-1 * var(--page-px));
+  margin-right: calc(-1 * var(--page-px));
+  padding-left: var(--page-px);
+  padding-right: var(--page-px);
+  margin-top: -32px;
+  padding-top: 32px;
+
+  @media (max-width: 768px) {
+    top: var(--topbar-h); // clear the mobile topbar
+    margin-top: -20px;
+    padding-top: 20px;
+  }
+}
+
 .page-title {
   font-size: 22px;
   font-weight: 700;
@@ -499,7 +521,9 @@ input, textarea { font-family: inherit; }
 .skeleton--cell { height: 13px; width: 70%; border-radius: var(--r-sm); }
 
 /* ─── Files card / table chrome ───────────────────────────────────────────── */
-.files-card { overflow: hidden; flex: 1; display: flex; flex-direction: column; }
+// overflow: clip — clips visually like hidden but does NOT create a scroll
+// container, so position: sticky on .table-head inside still works.
+.files-card { overflow: clip; flex: 1; display: flex; flex-direction: column; }
 .table-list  { list-style: none; }
 
 .table-head,

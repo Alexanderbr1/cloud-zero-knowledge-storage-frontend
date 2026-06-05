@@ -38,14 +38,21 @@ export class AuthService {
   private readonly ecPrivateKeySig = signal<CryptoKey | null>(null);
   private readonly userIdSig       = signal<string | null>(null);
 
-  private refreshInFlight$:      Observable<void> | null = null;
-  private pendingRecoveryPhrase: string | null           = null;
+  private refreshInFlight$: Observable<void> | null = null;
+
+  private readonly _recoveryPhrase = signal<string | null>(null);
+  readonly recoveryPhrase = this._recoveryPhrase.asReadonly();
 
   // ─── Публичное состояние ─────────────────────────────────────────────────
 
   readonly isAuthenticated = computed(() => !!this.accessTokenSig());
   readonly isUnlocked      = computed(() => !!this.kekSig());
   readonly email           = this.emailSig.asReadonly();
+
+  readonly authStatus = computed<'unauthenticated' | 'locked' | 'unlocked'>(() => {
+    if (!this.accessTokenSig()) return 'unauthenticated';
+    return this.kekSig() ? 'unlocked' : 'locked';
+  });
 
   // ─── Геттеры ─────────────────────────────────────────────────────────────
 
@@ -118,14 +125,12 @@ export class AuthService {
   }
 
   logout(): void {
-    this.http.post<void>(`${this.baseUrl}/logout`, {}).pipe(
-      take(1),
-      finalize(() => {
-        this.clearAccess();
-        this.lsRemove(LS_EMAIL, LS_EC_PRIVATE_KEY, LS_CK_BLOB, LS_SESSION_EXISTED);
-        this.emailSig.set(null);
-      }),
-    ).subscribe({ error: () => {} });
+    // Clear state synchronously so guards see 'unauthenticated' on the next navigation.
+    this.clearAccess();
+    this.lsRemove(LS_EMAIL, LS_EC_PRIVATE_KEY, LS_CK_BLOB, LS_SESSION_EXISTED);
+    this.emailSig.set(null);
+    // Fire HTTP logout best-effort — the refresh cookie is cleared server-side.
+    this.http.post<void>(`${this.baseUrl}/logout`, {}).pipe(take(1)).subscribe({ error: () => {} });
   }
 
   clearAccess(): void {
@@ -140,11 +145,8 @@ export class AuthService {
     return !!this.lsRead(LS_SESSION_EXISTED);
   }
 
-  // Одноразовое чтение — после вызова обнуляется.
-  consumeRecoveryPhrase(): string | null {
-    const phrase = this.pendingRecoveryPhrase;
-    this.pendingRecoveryPhrase = null;
-    return phrase;
+  clearRecoveryPhrase(): void {
+    this._recoveryPhrase.set(null);
   }
 
   requestPasswordReset(email: string): Observable<void> {
@@ -278,7 +280,7 @@ export class AuthService {
     this.lsWrite(LS_EC_PRIVATE_KEY, encryptedPrivateKeyB64);
     this.masterKeySig.set(masterKey);
     this.kekSig.set(kek);
-    this.pendingRecoveryPhrase = recoveryPhrase;
+    this._recoveryPhrase.set(recoveryPhrase);
     try {
       this.ecPrivateKeySig.set(await this.crypto.unwrapECPrivateKey(encryptedPrivateKeyB64, kek));
     } catch {}
@@ -375,6 +377,6 @@ export class AuthService {
     );
 
     // Store new phrase for one-time display — consumed by the component immediately after navigation.
-    this.pendingRecoveryPhrase = newRecoveryPhrase;
+    this._recoveryPhrase.set(newRecoveryPhrase);
   }
 }
