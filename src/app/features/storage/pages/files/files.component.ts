@@ -6,7 +6,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
-import { Subject, Subscription, catchError, debounceTime, distinctUntilChanged, finalize, firstValueFrom, forkJoin, from, of, switchMap } from 'rxjs';
+import { Subject, Subscription, catchError, debounceTime, distinctUntilChanged, finalize, forkJoin, from, of, switchMap } from 'rxjs';
 
 import { AuthService } from '../../../../core/services/auth.service';
 import { DownloadService } from '../../../../core/services/download.service';
@@ -174,8 +174,7 @@ export class FilesComponent implements OnInit {
 
   // ─── Download ─────────────────────────────────────────────────────────────
 
-  readonly downloadingFolderId = signal<string | null>(null);
-  readonly downloadingBlobId   = signal<string | null>(null);
+  readonly downloadingBlobId = signal<string | null>(null);
   readonly downloadProgress    = signal(0);
 
   // ─── Sharing dialog ───────────────────────────────────────────────────────
@@ -666,66 +665,6 @@ export class FilesComponent implements OnInit {
       },
       error: () => this.toast.error(`Не удалось удалить «${file.file_name}».`),
     });
-  }
-
-  // ─── Folder download ──────────────────────────────────────────────────────
-
-  downloadFolder(folder: FolderItem, event: Event): void {
-    event.stopPropagation();
-    if (this.downloadingFolderId()) return;
-    this.downloadingFolderId.set(folder.folder_id);
-    this.downloadProgress.set(0);
-
-    this.filesService.listFilesInFolder(folder.folder_id).pipe(
-      switchMap(files => {
-        if (!files.length) {
-          this.toast.error(`Папка «${folder.name}» пуста.`);
-          return of(null);
-        }
-        if (this.downloadService.swAvailable) {
-          // Service Worker path: one file at a time, peak RAM ≈ one chunk (~8 MiB).
-          return from(this.downloadService.downloadFolder(
-            files, folder.name,
-            pct => this.ngZone.run(() => this.downloadProgress.set(pct)),
-          ));
-        }
-        // Fallback: JSZip in memory (all files simultaneously).
-        return from(this.buildZip(files, folder.name));
-      }),
-      finalize(() => {
-        this.downloadingFolderId.set(null);
-        this.downloadProgress.set(0);
-      }),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: () => this.toast.success(`Папка «${folder.name}» скачана.`),
-      error: (err: unknown) => {
-        if (this.isKekMissing(err)) {
-          this.auth.clearAccess();
-          this.toast.error('Сессия истекла — войдите снова.');
-          return;
-        }
-        this.toast.error(`Не удалось скачать папку «${folder.name}».`);
-      },
-    });
-  }
-
-  private async buildZip(files: FileItem[], folderName: string): Promise<void> {
-    const { default: JSZip } = await import('jszip');
-    const zip = new JSZip();
-
-    await Promise.all(files.map(async file => {
-      const buffer = await firstValueFrom(this.filesService.downloadFileToBuffer(file.blob_id));
-      zip.file(file.file_name, buffer);
-    }));
-
-    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${folderName}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   // ─── Sharing dialog ───────────────────────────────────────────────────────

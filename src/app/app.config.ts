@@ -11,9 +11,6 @@ import { DownloadService } from './core/services/download.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    // withDisabledInitialNavigation + manual router.initialNavigation() after session restore.
-    // withEnabledBlockingInitialNavigation starts navigation CONCURRENTLY with APP_INITIALIZER,
-    // so guards would see authStatus='unauthenticated' while the refresh HTTP call is in-flight.
     provideRouter(routes, withDisabledInitialNavigation()),
     provideHttpClient(withInterceptors([credentialsInterceptor, authInterceptor])),
     {
@@ -22,7 +19,6 @@ export const appConfig: ApplicationConfig = {
         if (auth.hadSession()) {
           await firstValueFrom(auth.tryRestoreSession());
         }
-        // Navigation starts here — guards now see the correct auth state.
         router.initialNavigation();
       },
       deps: [AuthService, Router],

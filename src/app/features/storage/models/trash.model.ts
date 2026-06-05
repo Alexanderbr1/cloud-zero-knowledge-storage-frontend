@@ -11,9 +11,9 @@ export interface TrashFileItem {
 }
 
 export interface TrashFolderItem {
-  readonly folder_id: string;
-  readonly parent_id: string | null;
-  readonly name:      string;
+  readonly folder_id:  string;
+  readonly parent_id:  string | null;
+  readonly name:       string;
   readonly created_at: string;
 }
 

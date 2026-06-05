@@ -13,7 +13,7 @@ import { AuthService } from '../../../../core/services/auth.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ForgotPasswordComponent {
-  private readonly auth = inject(AuthService);
+  private readonly auth   = inject(AuthService);
   private readonly router = inject(Router);
 
   readonly email = new FormControl('', [Validators.required, Validators.email]);
