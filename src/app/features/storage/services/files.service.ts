@@ -1,412 +1,352 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import {
-  Observable,
-  firstValueFrom,
-  from,
-  map,
-  switchMap,
-  throwError,
-} from 'rxjs';
+import { Observable, firstValueFrom, from, map, switchMap, throwError } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
+import { AuthService } from '../../../core/services/auth.service';
+import { CryptoService, CHUNK_SIZE, FRAME_OVERHEAD } from '../../../core/services/crypto.service';
+import { triggerBrowserDownload } from '../../../core/utils/browser.utils';
 import { FileItem } from '../models/file-item.model';
 import { FolderItem } from '../models/folder.model';
 import { TrashListResponse } from '../models/trash.model';
-import {
-  CryptoService,
-  CHUNK_SIZE,
-  FRAME_OVERHEAD,
-} from '../../../core/services/crypto.service';
-import { AuthService } from '../../../core/services/auth.service';
-import { triggerBrowserDownload } from '../../../core/utils/browser.utils';
+
+// ─── Public types ─────────────────────────────────────────────────────────────
+
+export type UploadEvent =
+  | { phase: 'reading' | 'encrypting' | 'uploading'; pct: number }
+  | { phase: 'done'; blobId: string };
+
+// ─── API shapes ───────────────────────────────────────────────────────────────
 
 interface InitiateMultipartRequest {
-  file_name: string;
-  content_type: string;
+  file_name:          string;
+  content_type:       string;
   encrypted_file_key: string;
-  file_size: number;
-  file_size_plain: number;
-  chunk_size: number;
-  part_count: number;
-  folder_id?: string;
-}
-
-interface PartURLItem {
-  part_number: number;
-  url: string;
+  file_size:          number;
+  file_size_plain:    number;
+  chunk_size:         number;
+  part_count:         number;
+  folder_id?:         string;
 }
 
 interface InitiateMultipartResponse {
-  blob_id: string;
+  blob_id:   string;
   upload_id: string;
-  part_urls: PartURLItem[];
+  part_urls: Array<{ part_number: number; url: string }>;
 }
 
 interface PresignGetResponse {
-  blob_id: string;
-  download_url: string;
-  expires_in: number;
-  http_method: string;
-  content_type: string;
+  blob_id:            string;
+  download_url:       string;
+  expires_in:         number;
+  http_method:        string;
+  content_type:       string;
   encrypted_file_key: string;
-  file_size: number;
-  file_size_plain: number;
-  chunk_size: number;
+  file_size:          number;
+  file_size_plain:    number;
+  chunk_size:         number;
 }
 
-interface ListBlobsResponse {
-  items: FileItem[];
-}
+interface ListBlobsResponse   { items: FileItem[]   }
+interface ListFoldersResponse { items: FolderItem[] }
+interface SearchResponse      { blobs: FileItem[]; folders: FolderItem[] }
 
-interface ListFoldersResponse {
-  items: FolderItem[];
-}
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-interface SearchResponse {
-  blobs: FileItem[];
-  folders: FolderItem[];
-}
+const UPLOAD_CONCURRENCY = 3;
+const UPLOAD_RETRIES     = 3;
+
+// ─── Service ──────────────────────────────────────────────────────────────────
+
+type ProgressEmitter = (e: Exclude<UploadEvent, { phase: 'done' }>) => void;
 
 @Injectable({ providedIn: 'root' })
 export class FilesService {
-  private readonly http = inject(HttpClient);
+  private readonly http   = inject(HttpClient);
   private readonly crypto = inject(CryptoService);
-  private readonly auth = inject(AuthService);
-  private readonly baseUrl = `${environment.apiBaseUrl}/storage`;
+  private readonly auth   = inject(AuthService);
+
+  private readonly baseUrl  = `${environment.apiBaseUrl}/storage`;
+  private readonly trashUrl = `${environment.apiBaseUrl}/trash`;
 
   // ─── Blobs ────────────────────────────────────────────────────────────────
 
   listFilesInFolder(folderId: string | null): Observable<FileItem[]> {
-    const param = folderId === null ? 'root' : folderId;
     return this.http
-      .get<ListBlobsResponse>(`${this.baseUrl}/blobs`, {
-        params: { folder_id: param },
-      })
-      .pipe(map((r) => r.items));
+      .get<ListBlobsResponse>(`${this.baseUrl}/blobs`, { params: { folder_id: folderId ?? 'root' } })
+      .pipe(map(r => r.items));
   }
 
-  moveBlob(blobId: string, folderId: string | null): Observable<void> {
-    return this.http.patch<void>(
-      `${this.baseUrl}/blobs/${encodeURIComponent(blobId)}/folder`,
-      { folder_id: folderId },
-    );
-  }
-
-  renameFile(blobId: string, name: string): Observable<void> {
-    return this.http.patch<void>(
-      `${this.baseUrl}/blobs/${encodeURIComponent(blobId)}`,
-      { name },
-    );
-  }
-
-  uploadFile(
-    file: File,
-    onProgress?: (
-      phase: 'reading' | 'encrypting' | 'uploading',
-      pct: number,
-    ) => void,
-    folderId?: string | null,
-  ): Observable<{ blob_id: string }> {
+  uploadFile(file: File, folderId?: string | null): Observable<UploadEvent> {
     const kek = this.auth.getFileKey();
-    if (!kek)
-      return throwError(
-        () => new Error('KEK not available. Please log in again.'),
-      );
-    return from(this.multipartUpload(file, kek, folderId ?? null, onProgress));
+    if (!kek) return throwError(() => new Error('KEK not available. Please log in again.'));
+
+    return new Observable<UploadEvent>(subscriber => {
+      const abort = new AbortController();
+
+      this.multipartUpload(file, kek, folderId ?? null, abort.signal, e => subscriber.next(e))
+        .then(blobId => { subscriber.next({ phase: 'done', blobId }); subscriber.complete(); })
+        .catch(err   => { if (!isAbortError(err)) subscriber.error(err); });
+
+      return () => abort.abort();
+    });
   }
 
-  downloadFile(
-    blobId: string,
-    fileName: string,
-    onProgress?: (pct: number) => void,
-  ): Observable<void> {
-    return this.http
-      .post<PresignGetResponse>(
-        `${this.baseUrl}/blobs/${encodeURIComponent(blobId)}/presign-get`,
-        {},
-      )
-      .pipe(
-        switchMap((resp) =>
-          from(this.fetchAndDecrypt(resp, fileName, onProgress)),
-        ),
-      );
+  downloadFile(blobId: string, fileName: string, onProgress?: (pct: number) => void): Observable<void> {
+    return this.presignGet(blobId).pipe(
+      switchMap(resp => from(this.fetchAndDecrypt(resp, fileName, onProgress))),
+    );
   }
 
   downloadFileToBuffer(blobId: string): Observable<ArrayBuffer> {
-    return this.http
-      .post<PresignGetResponse>(
-        `${this.baseUrl}/blobs/${encodeURIComponent(blobId)}/presign-get`,
-        {},
-      )
-      .pipe(switchMap((resp) => from(this.fetchAndDecryptToBuffer(resp))));
+    return this.presignGet(blobId).pipe(
+      switchMap(resp => from(this.fetchAndDecryptToBuffer(resp))),
+    );
+  }
+
+  moveBlob(blobId: string, folderId: string | null): Observable<void> {
+    return this.http.patch<void>(this.blobUrl(blobId, 'folder'), { folder_id: folderId });
+  }
+
+  renameFile(blobId: string, name: string): Observable<void> {
+    return this.http.patch<void>(this.blobUrl(blobId), { name });
   }
 
   deleteFile(blobId: string): Observable<void> {
-    return this.http.delete<void>(
-      `${this.baseUrl}/blobs/${encodeURIComponent(blobId)}`,
-    );
+    return this.http.delete<void>(this.blobUrl(blobId));
   }
 
   // ─── Folders ──────────────────────────────────────────────────────────────
 
   listFolders(parentId: string | null): Observable<FolderItem[]> {
-    const params: Record<string, string> = parentId
-      ? { parent_id: parentId }
-      : {};
+    const params = parentId ? { parent_id: parentId } : {};
     return this.http
       .get<ListFoldersResponse>(`${this.baseUrl}/folders`, { params })
-      .pipe(map((r) => r.items));
+      .pipe(map(r => r.items));
   }
 
   createFolder(name: string, parentId: string | null): Observable<FolderItem> {
-    return this.http.post<FolderItem>(`${this.baseUrl}/folders`, {
-      name,
-      parent_id: parentId,
-    });
+    return this.http.post<FolderItem>(`${this.baseUrl}/folders`, { name, parent_id: parentId });
   }
 
   renameFolder(folderId: string, name: string): Observable<FolderItem> {
-    return this.http.patch<FolderItem>(
-      `${this.baseUrl}/folders/${encodeURIComponent(folderId)}`,
-      { name },
-    );
+    return this.http.patch<FolderItem>(this.folderUrl(folderId), { name });
   }
 
   moveFolder(folderId: string, newParentId: string | null): Observable<void> {
-    return this.http.patch<void>(
-      `${this.baseUrl}/folders/${encodeURIComponent(folderId)}/move`,
-      { parent_id: newParentId },
-    );
+    return this.http.patch<void>(this.folderUrl(folderId, 'move'), { parent_id: newParentId });
   }
 
   deleteFolder(folderId: string): Observable<void> {
-    return this.http.delete<void>(
-      `${this.baseUrl}/folders/${encodeURIComponent(folderId)}`,
-    );
+    return this.http.delete<void>(this.folderUrl(folderId));
   }
 
   search(query: string): Observable<SearchResponse> {
-    return this.http.get<SearchResponse>(`${this.baseUrl}/search`, {
-      params: { q: query },
-    });
+    return this.http.get<SearchResponse>(`${this.baseUrl}/search`, { params: { q: query } });
   }
 
   // ─── Trash ────────────────────────────────────────────────────────────────
-
-  private readonly trashUrl = `${environment.apiBaseUrl}/trash`;
 
   listTrash(): Observable<TrashListResponse> {
     return this.http.get<TrashListResponse>(this.trashUrl);
   }
 
   restoreBlob(blobId: string): Observable<void> {
-    return this.http.post<void>(
-      `${this.trashUrl}/blobs/${encodeURIComponent(blobId)}/restore`,
-      {},
-    );
+    return this.http.post<void>(`${this.trashUrl}/blobs/${enc(blobId)}/restore`, {});
   }
 
   hardDeleteBlob(blobId: string): Observable<void> {
-    return this.http.delete<void>(
-      `${this.trashUrl}/blobs/${encodeURIComponent(blobId)}`,
-    );
+    return this.http.delete<void>(`${this.trashUrl}/blobs/${enc(blobId)}`);
   }
 
   restoreFolder(folderId: string): Observable<void> {
-    return this.http.post<void>(
-      `${this.trashUrl}/folders/${encodeURIComponent(folderId)}/restore`,
-      {},
-    );
+    return this.http.post<void>(`${this.trashUrl}/folders/${enc(folderId)}/restore`, {});
   }
 
   hardDeleteFolder(folderId: string): Observable<void> {
-    return this.http.delete<void>(
-      `${this.trashUrl}/folders/${encodeURIComponent(folderId)}`,
-    );
+    return this.http.delete<void>(`${this.trashUrl}/folders/${enc(folderId)}`);
   }
 
   emptyTrash(): Observable<void> {
     return this.http.delete<void>(this.trashUrl);
   }
 
-  // ─── Private helpers ──────────────────────────────────────────────────────
+  // ─── Upload internals ─────────────────────────────────────────────────────
 
   private async multipartUpload(
-    file: File,
-    kek: CryptoKey,
+    file:     File,
+    kek:      CryptoKey,
     folderId: string | null,
-    onProgress?: (
-      phase: 'reading' | 'encrypting' | 'uploading',
-      pct: number,
-    ) => void,
-  ): Promise<{ blob_id: string }> {
-    const contentType = file.type?.trim() || 'application/octet-stream';
-    const chunkCount = Math.ceil(file.size / CHUNK_SIZE) || 1;
+    signal:   AbortSignal,
+    emit:     ProgressEmitter,
+  ): Promise<string> {
+    const contentType  = file.type?.trim() || 'application/octet-stream';
+    const chunkCount   = Math.ceil(file.size / CHUNK_SIZE) || 1;
     const totalEncSize = file.size + chunkCount * FRAME_OVERHEAD;
 
-    const fileKey = await this.crypto.generateFileKey();
-    const wrappedKeyB64 = await this.crypto.wrapFileKey(fileKey, kek);
-    const aad = this.ownerAad();
+    const fileKey    = await this.crypto.generateFileKey();
+    const wrappedKey = await this.crypto.wrapFileKey(fileKey, kek);
+    const aad        = this.ownerAad();
 
-    const initPayload: InitiateMultipartRequest = {
-      file_name: file.name,
-      content_type: contentType,
-      encrypted_file_key: wrappedKeyB64,
-      file_size: totalEncSize,
-      file_size_plain: file.size,
-      chunk_size: CHUNK_SIZE,
-      part_count: chunkCount,
-      ...(folderId ? { folder_id: folderId } : {}),
-    };
     const { blob_id, part_urls } = await firstValueFrom(
-      this.http.post<InitiateMultipartResponse>(
-        `${this.baseUrl}/blobs/initiate-multipart`,
-        initPayload,
-      ),
+      this.http.post<InitiateMultipartResponse>(`${this.baseUrl}/blobs/initiate-multipart`, {
+        file_name:          file.name,
+        content_type:       contentType,
+        encrypted_file_key: wrappedKey,
+        file_size:          totalEncSize,
+        file_size_plain:    file.size,
+        chunk_size:         CHUNK_SIZE,
+        part_count:         chunkCount,
+        ...(folderId ? { folder_id: folderId } : {}),
+      } satisfies InitiateMultipartRequest),
     );
 
-    const UPLOAD_CONCURRENCY = 3;
+    emit({ phase: 'reading', pct: 0 });
+
     try {
       for (let i = 0; i < chunkCount; i += UPLOAD_CONCURRENCY) {
-        const batch = Array.from(
-          { length: Math.min(UPLOAD_CONCURRENCY, chunkCount - i) },
-          (_, j) => i + j,
-        );
-        await Promise.all(
-          batch.map(async idx => {
-            const plain = await file
-              .slice(idx * CHUNK_SIZE, (idx + 1) * CHUNK_SIZE)
-              .arrayBuffer();
-            const frame = await this.crypto.encryptChunk(plain, fileKey, aad);
-            const partUrl = part_urls[idx]?.url;
-            if (!partUrl)
-              throw new Error(`Missing presigned URL for part ${idx + 1}`);
-            await this.uploadPartWithRetry(partUrl, frame, idx + 1);
-          }),
-        );
-        onProgress?.('uploading', Math.round(((i + batch.length) / chunkCount) * 100));
+        if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+
+        const batch = range(i, Math.min(i + UPLOAD_CONCURRENCY, chunkCount));
+
+        emit({ phase: 'encrypting', pct: pct(i, chunkCount) });
+        const frames = await Promise.all(batch.map(idx =>
+          file.slice(idx * CHUNK_SIZE, (idx + 1) * CHUNK_SIZE)
+              .arrayBuffer()
+              .then(plain => this.crypto.encryptChunk(plain, fileKey, aad)),
+        ));
+
+        emit({ phase: 'uploading', pct: pct(i, chunkCount) });
+        await Promise.all(batch.map((idx, j) => {
+          const url   = part_urls[idx]?.url;
+          const frame = frames[j];
+          if (!url || !frame) throw new Error(`Missing URL or frame for part ${idx + 1}`);
+          return this.uploadPartWithRetry(url, frame, idx + 1, signal);
+        }));
+
+        emit({ phase: 'uploading', pct: pct(i + batch.length, chunkCount) });
       }
-      onProgress?.('uploading', 100);
     } catch (err) {
-      this.http
-        .delete(`${this.baseUrl}/blobs/${encodeURIComponent(blob_id)}/abort`)
-        .subscribe({ error: () => {} });
+      if (!isAbortError(err)) {
+        this.http.delete(this.blobUrl(blob_id, 'abort')).subscribe({ error: () => {} });
+      }
       throw err;
     }
 
     await firstValueFrom(
-      this.http.post<void>(
-        `${this.baseUrl}/blobs/${encodeURIComponent(blob_id)}/complete-multipart`,
-        {},
-      ),
+      this.http.post<void>(`${this.baseUrl}/blobs/${enc(blob_id)}/complete-multipart`, {}),
     );
-    return { blob_id };
+
+    return blob_id;
   }
 
   private async uploadPartWithRetry(
-    url: string,
-    body: ArrayBuffer,
+    url:        string,
+    body:       ArrayBuffer,
     partNumber: number,
-    retries = 3,
+    signal:     AbortSignal,
+    retries = UPLOAD_RETRIES,
   ): Promise<void> {
     for (let attempt = 0; attempt < retries; attempt++) {
-      const resp = await fetch(url, { method: 'PUT', body: body.slice(0) });
+      if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+      const resp = await fetch(url, { method: 'PUT', body: body.slice(0), signal });
       if (resp.ok) return;
       if (attempt < retries - 1)
-        await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
+        await new Promise(r => setTimeout(r, 500 * 2 ** attempt));
     }
-    throw new Error(
-      `Part ${partNumber} upload failed after ${retries} attempts`,
-    );
+    throw new Error(`Part ${partNumber} upload failed after ${retries} attempts`);
   }
 
-  private ownerAad(ownerUserId?: string): Uint8Array {
-    const id = ownerUserId ?? this.auth.userId();
-    if (!id)
-      throw new Error(
-        'User ID unavailable — cannot derive AAD for file encryption.',
-      );
-    return new TextEncoder().encode(id);
+  // ─── Download internals ───────────────────────────────────────────────────
+
+  private presignGet(blobId: string): Observable<PresignGetResponse> {
+    return this.http.post<PresignGetResponse>(this.blobUrl(blobId, 'presign-get'), {});
   }
 
-  private async fetchAndDecryptToBuffer(
-    resp: PresignGetResponse,
-  ): Promise<ArrayBuffer> {
+  private async fetchAndDecryptToBuffer(resp: PresignGetResponse): Promise<ArrayBuffer> {
     const kek = this.auth.getFileKey();
     if (!kek) throw new Error('KEK not available. Please log in again.');
-    const fetchResp = await fetch(resp.download_url);
-    if (!fetchResp.ok)
-      throw new Error(`Download failed with status ${fetchResp.status}`);
-    const encrypted = await fetchResp.arrayBuffer();
-    const fileKey = await this.crypto.unwrapFileKey(
-      resp.encrypted_file_key,
-      kek,
-    );
-    return this.crypto.decryptFileChunked(
-      encrypted,
-      fileKey,
-      resp.chunk_size,
-      this.ownerAad(),
-    );
+
+    const r = await fetch(resp.download_url);
+    if (!r.ok) throw new Error(`Download failed: ${r.status}`);
+
+    const fileKey = await this.crypto.unwrapFileKey(resp.encrypted_file_key, kek);
+    return this.crypto.decryptFileChunked(await r.arrayBuffer(), fileKey, resp.chunk_size, this.ownerAad());
   }
 
   private async fetchAndDecrypt(
-    resp: PresignGetResponse,
-    fileName: string,
+    resp:        PresignGetResponse,
+    fileName:    string,
     onProgress?: (pct: number) => void,
   ): Promise<void> {
     const kek = this.auth.getFileKey();
-    if (!kek) {
-      throw new Error('KEK not available. Please log in again.');
-    }
+    if (!kek) throw new Error('KEK not available. Please log in again.');
 
-    const fetchResp = await fetch(resp.download_url);
-    if (!fetchResp.ok) {
-      throw new Error(`Download failed with status ${fetchResp.status}`);
-    }
+    const r = await fetch(resp.download_url);
+    if (!r.ok) throw new Error(`Download failed: ${r.status}`);
 
-    let encryptedData: ArrayBuffer;
+    const encrypted = onProgress && r.body
+      ? await readWithProgress(r, onProgress)
+      : await r.arrayBuffer();
 
-    if (onProgress && fetchResp.body) {
-      const total = parseInt(
-        fetchResp.headers.get('Content-Length') ?? '0',
-        10,
-      );
-      const reader = fetchResp.body.getReader();
-      const chunks: Uint8Array[] = [];
-      let received = 0;
-
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        received += value.length;
-        if (total > 0) onProgress(Math.round((received / total) * 100));
-      }
-
-      const merged = new Uint8Array(received);
-      let offset = 0;
-      for (const chunk of chunks) {
-        merged.set(chunk, offset);
-        offset += chunk.length;
-      }
-      encryptedData = merged.buffer;
-    } else {
-      encryptedData = await fetchResp.arrayBuffer();
-    }
-
-    const fileKey = await this.crypto.unwrapFileKey(
-      resp.encrypted_file_key,
-      kek,
-    );
-    const plaintext = await this.crypto.decryptFileChunked(
-      encryptedData,
-      fileKey,
-      resp.chunk_size,
-      this.ownerAad(),
-    );
-
+    const fileKey   = await this.crypto.unwrapFileKey(resp.encrypted_file_key, kek);
+    const plaintext = await this.crypto.decryptFileChunked(encrypted, fileKey, resp.chunk_size, this.ownerAad());
     triggerBrowserDownload(plaintext, fileName, resp.content_type);
   }
+
+  // ─── URL builders ─────────────────────────────────────────────────────────
+
+  private blobUrl(blobId: string, suffix?: string): string {
+    const base = `${this.baseUrl}/blobs/${enc(blobId)}`;
+    return suffix ? `${base}/${suffix}` : base;
+  }
+
+  private folderUrl(folderId: string, suffix?: string): string {
+    const base = `${this.baseUrl}/folders/${enc(folderId)}`;
+    return suffix ? `${base}/${suffix}` : base;
+  }
+
+  private ownerAad(userId?: string): Uint8Array {
+    const id = userId ?? this.auth.userId();
+    if (!id) throw new Error('User ID unavailable — cannot derive AAD for file encryption.');
+    return new TextEncoder().encode(id);
+  }
+}
+
+// ─── Module-level helpers ─────────────────────────────────────────────────────
+
+function enc(id: string): string {
+  return encodeURIComponent(id);
+}
+
+function pct(done: number, total: number): number {
+  return Math.round((done / total) * 100);
+}
+
+function range(start: number, end: number): number[] {
+  return Array.from({ length: end - start }, (_, i) => start + i);
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError';
+}
+
+async function readWithProgress(r: Response, onProgress: (pct: number) => void): Promise<ArrayBuffer> {
+  const total  = parseInt(r.headers.get('Content-Length') ?? '0', 10);
+  const reader = r.body!.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    if (total > 0) onProgress(Math.round((received / total) * 100));
+  }
+
+  const merged = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) { merged.set(chunk, offset); offset += chunk.length; }
+  return merged.buffer;
 }

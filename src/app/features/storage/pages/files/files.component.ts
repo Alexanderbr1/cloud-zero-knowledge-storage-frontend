@@ -14,7 +14,7 @@ import { StorageUsageService } from '../../../../core/services/storage-usage.ser
 import { ToastService } from '../../../../core/services/toast.service';
 import { FileItem } from '../../models/file-item.model';
 import { BreadcrumbItem, FolderItem } from '../../models/folder.model';
-import { FilesService } from '../../services/files.service';
+import { FilesService, UploadEvent } from '../../services/files.service';
 import { FavoritesService } from '../../../favorites/services/favorites.service';
 import { formatSize, shortMimeType } from '../../../../core/utils/browser.utils';
 import { InputModalComponent } from '../../../../shared/components/input-modal/input-modal.component';
@@ -585,15 +585,8 @@ export class FilesComponent implements OnInit {
     const file = this.selectedFile();
     if (!file) return;
 
-    this.uploadPhase.set('reading');
-    this.uploadProgress.set(0);
-
     this.uploadSub = this.filesService
-      .uploadFile(
-        file,
-        (phase, pct) => { this.uploadPhase.set(phase); this.uploadProgress.set(pct); },
-        this.currentFolderId(),
-      )
+      .uploadFile(file, this.currentFolderId())
       .pipe(
         finalize(() => {
           this.uploadSub = null;
@@ -604,11 +597,16 @@ export class FilesComponent implements OnInit {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: () => {
-          this.toast.success(`Файл «${file.name}» загружен.`);
-          this.selectedFile.set(null);
-          this.loadContent();
-          this.usageSvc.refresh();
+        next: (event: UploadEvent) => {
+          if (event.phase === 'done') {
+            this.toast.success(`Файл «${file.name}» загружен.`);
+            this.selectedFile.set(null);
+            this.loadContent();
+            this.usageSvc.refresh();
+          } else {
+            this.uploadPhase.set(event.phase);
+            this.uploadProgress.set(event.pct);
+          }
         },
         error: (err: unknown) => {
           this.selectedFile.set(null);
