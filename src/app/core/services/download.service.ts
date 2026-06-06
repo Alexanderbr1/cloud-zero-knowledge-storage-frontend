@@ -15,7 +15,6 @@ interface PresignGetResponse {
   chunk_size:         number;
 }
 
-// Single-file SW metadata
 interface SwSingleFileMeta {
   downloadUrl:  string;
   rawKey:       ArrayBuffer;
@@ -41,10 +40,6 @@ export class DownloadService {
     try {
       await navigator.serviceWorker.register('/sw.js', { scope: '/' });
 
-      // register() resolves when the SW is installed, but the SW may not yet
-      // control this page (clients.claim() runs asynchronously in activate).
-      // Wait for it to take control before marking as ready — otherwise the
-      // first download click goes to the server instead of the SW.
       if (!navigator.serviceWorker.controller) {
         await new Promise<void>(resolve => {
           navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true });
@@ -60,7 +55,6 @@ export class DownloadService {
         }
       });
     } catch {
-      // SW unavailable (e.g. non-HTTPS dev env) — fall back to legacy download.
     }
   }
 
@@ -93,8 +87,6 @@ export class DownloadService {
         ownerUserId:  this.auth.userId() ?? '',
       });
 
-      // Safety net: remove metadata if SW never picks it up within 60s.
-      // Normal cleanup is handled by the GET_SW_DOWNLOAD message listener in init().
       setTimeout(() => window.__swDownloads?.delete(downloadId), 60_000);
 
       const a = document.createElement('a');
@@ -106,7 +98,6 @@ export class DownloadService {
       return;
     }
 
-    // SW unavailable — decrypt in memory (chunked).
     const encryptedData = await (await fetch(resp.download_url)).arrayBuffer();
     const fileKey       = await this.crypto.unwrapFileKey(resp.encrypted_file_key, kek);
     const aad           = this.ownerAad();

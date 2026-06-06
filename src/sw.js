@@ -1,19 +1,7 @@
-// Service Worker — streaming chunked file download.
-//
-// Flow:
-//  1. Main thread stores metadata in window.__swDownloads (Map keyed by UUID).
-//  2. Main thread fetches /sw-download/{id}/{filename}.
-//  3. SW intercepts, asks main thread for metadata via MessageChannel,
-//     then streams decrypted chunks back as a pull-based Response.
-//
-// Frame format: [12 bytes IV][AES-256-GCM ciphertext + 16 bytes tag]
-
-const FRAME_OVERHEAD = 28; // 12 IV + 16 GCM tag
+const FRAME_OVERHEAD = 28;
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
-
-// ─── Single file ─────────────────────────────────────────────────────────────
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
@@ -44,15 +32,22 @@ async function handleDownload(downloadId, filename) {
     return new Response('Failed to import file key', { status: 500 });
   }
 
-  let nextChunk = 0;
+  const fetchChunk = i => {
+    const frameStart = i * frameSize;
+    const frameEnd   = Math.min(frameStart + frameSize - 1, fileSize - 1);
+    return fetch(downloadUrl, { headers: { Range: `bytes=${frameStart}-${frameEnd}` } });
+  };
+
+  let nextChunk  = 0;
+  let prefetched = chunkCount > 0 ? fetchChunk(0) : null;
+
   const stream = new ReadableStream({
     async pull(controller) {
       if (nextChunk >= chunkCount) { controller.close(); return; }
-      const i          = nextChunk++;
-      const frameStart = i * frameSize;
-      const frameEnd   = Math.min(frameStart + frameSize - 1, fileSize - 1);
+      const i    = nextChunk++;
+      const resp = await prefetched;
+      prefetched = nextChunk < chunkCount ? fetchChunk(nextChunk) : null;
       try {
-        const resp = await fetch(downloadUrl, { headers: { Range: `bytes=${frameStart}-${frameEnd}` } });
         if (!resp.ok && resp.status !== 206) throw new Error(`S3 range fetch failed: ${resp.status}`);
         const frameBuf = await resp.arrayBuffer();
         const plain    = await crypto.subtle.decrypt(
@@ -77,8 +72,6 @@ async function handleDownload(downloadId, filename) {
     },
   });
 }
-
-// ─── Shared: get metadata from main thread via MessageChannel ─────────────────
 
 async function getMetaFromMainThread(downloadId) {
   const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });

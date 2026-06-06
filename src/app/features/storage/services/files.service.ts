@@ -232,7 +232,6 @@ export class FilesService {
 
   // ─── Private helpers ──────────────────────────────────────────────────────
 
-  // Encrypts and uploads one chunk at a time — peak RAM ≈ CHUNK_SIZE * 2 ≈ 16 MB.
   private async multipartUpload(
     file: File,
     kek: CryptoKey,
@@ -250,7 +249,6 @@ export class FilesService {
     const wrappedKeyB64 = await this.crypto.wrapFileKey(fileKey, kek);
     const aad = this.ownerAad();
 
-    // 1. Initiate multipart — get presigned part URLs.
     const initPayload: InitiateMultipartRequest = {
       file_name: file.name,
       content_type: contentType,
@@ -268,32 +266,35 @@ export class FilesService {
       ),
     );
 
-    // 2. Encrypt each chunk and PUT it directly to MinIO.
-    // Each iteration = one full cycle: read → encrypt → upload.
-    // Progress is reported as a single 'uploading' percentage across all parts.
+    const UPLOAD_CONCURRENCY = 3;
     try {
-      for (let i = 0; i < chunkCount; i++) {
-        onProgress?.('uploading', Math.round((i / chunkCount) * 100));
-        const plain = await file
-          .slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
-          .arrayBuffer();
-        const frame = await this.crypto.encryptChunk(plain, fileKey, aad);
-
-        const partUrl = part_urls[i]?.url;
-        if (!partUrl)
-          throw new Error(`Missing presigned URL for part ${i + 1}`);
-        await this.uploadPartWithRetry(partUrl, frame, i + 1);
+      for (let i = 0; i < chunkCount; i += UPLOAD_CONCURRENCY) {
+        const batch = Array.from(
+          { length: Math.min(UPLOAD_CONCURRENCY, chunkCount - i) },
+          (_, j) => i + j,
+        );
+        await Promise.all(
+          batch.map(async idx => {
+            const plain = await file
+              .slice(idx * CHUNK_SIZE, (idx + 1) * CHUNK_SIZE)
+              .arrayBuffer();
+            const frame = await this.crypto.encryptChunk(plain, fileKey, aad);
+            const partUrl = part_urls[idx]?.url;
+            if (!partUrl)
+              throw new Error(`Missing presigned URL for part ${idx + 1}`);
+            await this.uploadPartWithRetry(partUrl, frame, idx + 1);
+          }),
+        );
+        onProgress?.('uploading', Math.round(((i + batch.length) / chunkCount) * 100));
       }
       onProgress?.('uploading', 100);
     } catch (err) {
-      // best-effort: tell backend to abort the multipart upload and free MinIO storage
       this.http
         .delete(`${this.baseUrl}/blobs/${encodeURIComponent(blob_id)}/abort`)
         .subscribe({ error: () => {} });
       throw err;
     }
 
-    // 3. Tell backend to complete the multipart upload.
     await firstValueFrom(
       this.http.post<void>(
         `${this.baseUrl}/blobs/${encodeURIComponent(blob_id)}/complete-multipart`,
