@@ -277,7 +277,7 @@ describe('FilesService', () => {
     expect(result).toEqual({ blobs: [FILE], folders: [] });
   }));
 
-  // ─── uploadFile / downloadFile — KEK missing ──────────────────────────────
+  // ─── uploadFile — KEK missing ─────────────────────────────────────────────
 
   it('uploadFile() returns an error immediately when KEK is null', fakeAsync(() => {
     mockAuth.getFileKey.and.returnValue(null);
@@ -290,30 +290,6 @@ describe('FilesService', () => {
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toContain('KEK');
     http.expectNone(`${STORAGE}/presign`);
-  }));
-
-  it('downloadFile() emits error when KEK is null after presign', fakeAsync(() => {
-    mockAuth.getFileKey.and.returnValue(null);
-
-    let error: unknown;
-    svc.downloadFile('blob-1', 'file.txt').subscribe({
-      error: (e: unknown) => (error = e),
-    });
-    tick();
-
-    // The presign-get POST goes out; flush it so the async chain proceeds.
-    http.expectOne(`${STORAGE}/blobs/blob-1/presign-get`).flush({
-      blob_id: 'blob-1',
-      download_url: 'https://s3.example.com/blob-1',
-      expires_in: 300,
-      http_method: 'GET',
-      content_type: 'application/pdf',
-      encrypted_file_key: 'key==',
-        });
-    tick(); // runs the promise (fetchAndDecrypt), which throws immediately on missing KEK
-
-    expect(error).toBeInstanceOf(Error);
-    expect((error as Error).message).toContain('KEK');
   }));
 
   // ─── Trash ────────────────────────────────────────────────────────────────

@@ -1,11 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, firstValueFrom, from, map, switchMap, throwError } from 'rxjs';
+import { Observable, firstValueFrom, map, throwError } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
 import { AuthService } from '../../../core/services/auth.service';
 import { CryptoService, CHUNK_SIZE, FRAME_OVERHEAD } from '../../../core/services/crypto.service';
-import { triggerBrowserDownload } from '../../../core/utils/browser.utils';
 import { FileItem } from '../models/file-item.model';
 import { FolderItem } from '../models/folder.model';
 import { TrashListResponse } from '../models/trash.model';
@@ -33,18 +32,6 @@ interface InitiateMultipartResponse {
   blob_id:   string;
   upload_id: string;
   part_urls: Array<{ part_number: number; url: string }>;
-}
-
-interface PresignGetResponse {
-  blob_id:            string;
-  download_url:       string;
-  expires_in:         number;
-  http_method:        string;
-  content_type:       string;
-  encrypted_file_key: string;
-  file_size:          number;
-  file_size_plain:    number;
-  chunk_size:         number;
 }
 
 interface ListBlobsResponse   { items: FileItem[]   }
@@ -90,18 +77,6 @@ export class FilesService {
 
       return () => abort.abort();
     });
-  }
-
-  downloadFile(blobId: string, fileName: string, onProgress?: (pct: number) => void): Observable<void> {
-    return this.presignGet(blobId).pipe(
-      switchMap(resp => from(this.fetchAndDecrypt(resp, fileName, onProgress))),
-    );
-  }
-
-  downloadFileToBuffer(blobId: string): Observable<ArrayBuffer> {
-    return this.presignGet(blobId).pipe(
-      switchMap(resp => from(this.fetchAndDecryptToBuffer(resp))),
-    );
   }
 
   moveBlob(blobId: string, folderId: string | null): Observable<void> {
@@ -257,43 +232,6 @@ export class FilesService {
     throw new Error(`Part ${partNumber} upload failed after ${retries} attempts`);
   }
 
-  // ─── Download internals ───────────────────────────────────────────────────
-
-  private presignGet(blobId: string): Observable<PresignGetResponse> {
-    return this.http.post<PresignGetResponse>(this.blobUrl(blobId, 'presign-get'), {});
-  }
-
-  private async fetchAndDecryptToBuffer(resp: PresignGetResponse): Promise<ArrayBuffer> {
-    const kek = this.auth.getFileKey();
-    if (!kek) throw new Error('KEK not available. Please log in again.');
-
-    const r = await fetch(resp.download_url);
-    if (!r.ok) throw new Error(`Download failed: ${r.status}`);
-
-    const fileKey = await this.crypto.unwrapFileKey(resp.encrypted_file_key, kek);
-    return this.crypto.decryptFileChunked(await r.arrayBuffer(), fileKey, resp.chunk_size, this.ownerAad());
-  }
-
-  private async fetchAndDecrypt(
-    resp:        PresignGetResponse,
-    fileName:    string,
-    onProgress?: (pct: number) => void,
-  ): Promise<void> {
-    const kek = this.auth.getFileKey();
-    if (!kek) throw new Error('KEK not available. Please log in again.');
-
-    const r = await fetch(resp.download_url);
-    if (!r.ok) throw new Error(`Download failed: ${r.status}`);
-
-    const encrypted = onProgress && r.body
-      ? await readWithProgress(r, onProgress)
-      : await r.arrayBuffer();
-
-    const fileKey   = await this.crypto.unwrapFileKey(resp.encrypted_file_key, kek);
-    const plaintext = await this.crypto.decryptFileChunked(encrypted, fileKey, resp.chunk_size, this.ownerAad());
-    triggerBrowserDownload(plaintext, fileName, resp.content_type);
-  }
-
   // ─── URL builders ─────────────────────────────────────────────────────────
 
   private blobUrl(blobId: string, suffix?: string): string {
@@ -329,24 +267,4 @@ function range(start: number, end: number): number[] {
 
 function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === 'AbortError';
-}
-
-async function readWithProgress(r: Response, onProgress: (pct: number) => void): Promise<ArrayBuffer> {
-  const total  = parseInt(r.headers.get('Content-Length') ?? '0', 10);
-  const reader = r.body!.getReader();
-  const chunks: Uint8Array[] = [];
-  let received = 0;
-
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    received += value.length;
-    if (total > 0) onProgress(Math.round((received / total) * 100));
-  }
-
-  const merged = new Uint8Array(received);
-  let offset = 0;
-  for (const chunk of chunks) { merged.set(chunk, offset); offset += chunk.length; }
-  return merged.buffer;
 }

@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom, from } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
@@ -32,8 +32,9 @@ export class DownloadService {
   private readonly auth   = inject(AuthService);
   private readonly crypto = inject(CryptoService);
 
-  private readonly baseUrl = `${environment.apiBaseUrl}/storage`;
-  private swRegistered     = false;
+  private readonly baseUrl    = `${environment.apiBaseUrl}/storage`;
+  private swRegistered        = false;
+  private readonly progressHandlers = new Map<string, (pct: number) => void>();
 
   async init(): Promise<void> {
     if (!('serviceWorker' in navigator)) return;
@@ -53,9 +54,16 @@ export class DownloadService {
           event.ports[0]?.postMessage(meta);
           if (meta) window.__swDownloads?.delete(event.data.id);
         }
+        if (event.data?.type === 'SW_DOWNLOAD_PROGRESS') {
+          this.progressHandlers.get(event.data.id)?.(event.data.pct as number);
+        }
       });
     } catch {
     }
+  }
+
+  downloadFile(blobId: string, fileName: string): Observable<void> {
+    return from(this.download(blobId, fileName));
   }
 
   async download(
@@ -69,7 +77,7 @@ export class DownloadService {
     const resp = await firstValueFrom(
       this.http.post<PresignGetResponse>(
         `${this.baseUrl}/blobs/${encodeURIComponent(blobId)}/presign-get`, {},
-      )
+      ),
     );
 
     if (this.swRegistered) {
@@ -77,7 +85,7 @@ export class DownloadService {
       const downloadId = crypto.randomUUID();
       const swUrl      = `/sw-download/${downloadId}/${encodeURIComponent(fileName)}`;
 
-      window.__swDownloads = window.__swDownloads ?? new Map();
+      window.__swDownloads ??= new Map();
       window.__swDownloads.set(downloadId, {
         downloadUrl:  resp.download_url,
         rawKey:       fileKey,
@@ -89,12 +97,25 @@ export class DownloadService {
 
       setTimeout(() => window.__swDownloads?.delete(downloadId), 60_000);
 
+      const done = new Promise<void>(resolve => {
+        this.progressHandlers.set(downloadId, pct => {
+          onProgress?.(pct);
+          if (pct >= 100) {
+            this.progressHandlers.delete(downloadId);
+            resolve();
+          }
+        });
+        // Safety valve: resolve after 10 min if SW never signals completion.
+        setTimeout(() => { this.progressHandlers.delete(downloadId); resolve(); }, 10 * 60 * 1000);
+      });
+
       const a = document.createElement('a');
       a.href  = swUrl;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      onProgress?.(100);
+
+      await done;
       return;
     }
 

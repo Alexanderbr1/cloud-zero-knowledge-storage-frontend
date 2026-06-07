@@ -16,9 +16,10 @@ self.addEventListener('fetch', event => {
 });
 
 async function handleDownload(downloadId, filename) {
-  const meta = await getMetaFromMainThread(downloadId);
-  if (!meta) return new Response('Download not found or expired', { status: 404 });
+  const result = await getMetaFromMainThread(downloadId);
+  if (!result) return new Response('Download not found or expired', { status: 404 });
 
+  const { meta, client } = result;
   const { downloadUrl, rawKey, chunkSize, fileSize, contentType, ownerUserId } = meta;
   const aad        = ownerUserId ? new TextEncoder().encode(ownerUserId) : null;
   const frameSize  = chunkSize + FRAME_OVERHEAD;
@@ -56,6 +57,11 @@ async function handleDownload(downloadId, filename) {
           new Uint8Array(frameBuf, 12),
         );
         controller.enqueue(new Uint8Array(plain));
+        client.postMessage({
+          type: 'SW_DOWNLOAD_PROGRESS',
+          id:   downloadId,
+          pct:  Math.round(((i + 1) / chunkCount) * 100),
+        });
       } catch (err) {
         controller.error(err);
       }
@@ -83,7 +89,7 @@ async function getMetaFromMainThread(downloadId) {
     });
     client.postMessage({ type: 'GET_SW_DOWNLOAD', id: downloadId }, [port2]);
     const meta = await reply;
-    if (meta) return meta;
+    if (meta) return { meta, client };
   }
   return null;
 }

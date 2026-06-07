@@ -4,7 +4,7 @@ import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 
 import { ToastService } from '../../../../core/services/toast.service';
-import { FilesService } from '../../../storage/services/files.service';
+import { DownloadService } from '../../../../core/services/download.service';
 import { FileItem } from '../../../storage/models/file-item.model';
 import { FolderItem } from '../../../storage/models/folder.model';
 import { FavoritesService } from '../../services/favorites.service';
@@ -18,8 +18,8 @@ import { formatSize, shortMimeType } from '../../../../core/utils/browser.utils'
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FavoritesComponent implements OnInit {
-  private readonly favoritesService = inject(FavoritesService);
-  private readonly filesService     = inject(FilesService);
+  private readonly favoritesService  = inject(FavoritesService);
+  private readonly downloadService   = inject(DownloadService);
   private readonly toast            = inject(ToastService);
   private readonly destroyRef       = inject(DestroyRef);
   private readonly router           = inject(Router);
@@ -53,7 +53,7 @@ export class FavoritesComponent implements OnInit {
   }
 
   download(file: FileItem): void {
-    this.filesService.downloadFile(file.blob_id, file.file_name).pipe(
+    this.downloadService.downloadFile(file.blob_id, file.file_name).pipe(
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       error: () => this.toast.error('Не удалось скачать файл.'),

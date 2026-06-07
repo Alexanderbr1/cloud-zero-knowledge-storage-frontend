@@ -9,7 +9,7 @@ import { of, throwError } from 'rxjs';
 
 import { FavoritesComponent } from './favorites.component';
 import { FavoritesService } from '../../services/favorites.service';
-import { FilesService } from '../../../storage/services/files.service';
+import { DownloadService } from '../../../../core/services/download.service';
 import { ToastService } from '../../../../core/services/toast.service';
 import { FileItem } from '../../../storage/models/file-item.model';
 import { FolderItem } from '../../../storage/models/folder.model';
@@ -28,18 +28,18 @@ describe('FavoritesComponent', () => {
   let fixture:        ComponentFixture<FavoritesComponent>;
   let comp:           FavoritesComponent;
   let favStub:        jasmine.SpyObj<FavoritesService>;
-  let filesStub:      jasmine.SpyObj<FilesService>;
+  let downloadStub:   jasmine.SpyObj<DownloadService>;
   let toastStub:      jasmine.SpyObj<ToastService>;
 
   beforeEach(async () => {
-    favStub   = jasmine.createSpyObj('FavoritesService', ['list', 'removeBlob', 'removeFolder']);
-    filesStub = jasmine.createSpyObj('FilesService', ['downloadFile']);
-    toastStub = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    favStub      = jasmine.createSpyObj('FavoritesService', ['list', 'removeBlob', 'removeFolder']);
+    downloadStub = jasmine.createSpyObj('DownloadService', ['downloadFile']);
+    toastStub    = jasmine.createSpyObj('ToastService', ['success', 'error']);
 
     favStub.list.and.returnValue(of({ blobs: [FILE], folders: [FOLDER] }));
     favStub.removeBlob.and.returnValue(of(undefined));
     favStub.removeFolder.and.returnValue(of(undefined));
-    filesStub.downloadFile.and.returnValue(of(undefined));
+    downloadStub.downloadFile.and.returnValue(of(undefined));
 
     await TestBed.configureTestingModule({
       imports:   [FavoritesComponent],
@@ -47,9 +47,9 @@ describe('FavoritesComponent', () => {
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: FavoritesService, useValue: favStub   },
-        { provide: FilesService,     useValue: filesStub },
-        { provide: ToastService,     useValue: toastStub },
+        { provide: FavoritesService, useValue: favStub      },
+        { provide: DownloadService,  useValue: downloadStub },
+        { provide: ToastService,     useValue: toastStub    },
       ],
     }).compileComponents();
 
@@ -135,18 +135,18 @@ describe('FavoritesComponent', () => {
 
   // ─── download ─────────────────────────────────────────────────────────────
 
-  it('download() calls filesService.downloadFile', fakeAsync(() => {
+  it('download() calls downloadService.downloadFile', fakeAsync(() => {
     fixture.detectChanges();
     tick();
 
     comp.download(FILE);
     tick();
 
-    expect(filesStub.downloadFile).toHaveBeenCalledWith('blob-1', 'photo.jpg');
+    expect(downloadStub.downloadFile).toHaveBeenCalledWith('blob-1', 'photo.jpg');
   }));
 
   it('download() shows toast error on failure', fakeAsync(() => {
-    filesStub.downloadFile.and.returnValue(throwError(() => new Error('download failed')));
+    downloadStub.downloadFile.and.returnValue(throwError(() => new Error('download failed')));
     fixture.detectChanges();
     tick();
 
