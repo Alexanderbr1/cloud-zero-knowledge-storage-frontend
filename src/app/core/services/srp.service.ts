@@ -36,7 +36,7 @@ export class SrpService {
   // ─── Public API ──────────────────────────────────────────────────────────
 
   async createVerifier(password: string): Promise<{ srpSalt: string; srpVerifier: string; bcryptSalt: string }> {
-    const bcryptSalt    = await bcrypt.genSalt(10);
+    const bcryptSalt    = await bcrypt.genSalt(12);
     const pwHash        = await bcrypt.hash(password, bcryptSalt);
     const srpSaltBytes  = globalThis.crypto.getRandomValues(new Uint8Array(32));
     const x             = await this.computeX(srpSaltBytes, pwHash);

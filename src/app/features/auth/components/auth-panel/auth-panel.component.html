@@ -114,7 +114,7 @@
       <button
         type="submit"
         class="btn btn--primary btn--lg auth-submit"
-        [disabled]="isSubmitting() || credentialsForm().invalid"
+        [disabled]="isSubmitting() || credentialsForm().invalid || (mode() === 'register' && strengthLevel() < 4)"
       >
         {{ isSubmitting()
             ? (mode() === 'register' ? 'Создаём аккаунт…' : 'Входим…')

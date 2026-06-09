@@ -311,7 +311,6 @@ export class AuthService {
       throw new Error('SRP: server proof (M2) verification failed — possible MITM attack');
     }
 
-
     const masterKey = await this.crypto.deriveMasterKey(
       password,
       new Uint8Array(fromBase64(initResp.crypto_salt)),
