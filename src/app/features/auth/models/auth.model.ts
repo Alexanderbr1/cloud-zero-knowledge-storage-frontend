@@ -29,13 +29,25 @@ export interface LoginFinalizeRequest {
   readonly M1:         string;
 }
 
-export interface TokenResponse {
-  readonly access_token:          string;
-  readonly expires_in:            number;
-  readonly refresh_expires_in:    number;
-  readonly token_type:            string;
-  readonly M2?:                   string;
-  readonly encrypted_private_key?: string;
-  readonly kek_encrypted_master?: string;
-  readonly client_key?:           string;
+interface BaseTokenResponse {
+  readonly access_token:       string;
+  readonly expires_in:         number;
+  readonly refresh_expires_in: number;
+  readonly token_type:         string;
+  readonly client_key:         string;
+}
+
+export interface RegisterResponse extends BaseTokenResponse {}
+
+export interface LoginFinalizeResponse extends BaseTokenResponse {
+  readonly M2:                    string;
+  readonly crypto_salt:           string;
+  readonly kek_encrypted_master:  string;
+  readonly encrypted_private_key: string;
+}
+
+export interface RefreshResponse extends BaseTokenResponse {
+  readonly crypto_salt:           string;
+  readonly kek_encrypted_master:  string;
+  readonly encrypted_private_key: string;
 }

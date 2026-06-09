@@ -289,7 +289,7 @@ describe('FilesService', () => {
 
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toContain('KEK');
-    http.expectNone(`${STORAGE}/presign`);
+    http.expectNone(`${STORAGE}/blobs/initiate-multipart`);
   }));
 
   // ─── Trash ────────────────────────────────────────────────────────────────

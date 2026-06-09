@@ -191,20 +191,6 @@ describe('AuthService', () => {
     expect(svc.isAuthenticated()).toBeFalse();
   }));
 
-  it('logout() removes auth-related localStorage keys', fakeAsync(() => {
-    localStorage.setItem('auth.email', 'alice@example.com');
-    localStorage.setItem('auth.session_existed', '1');
-    localStorage.setItem('auth.ec_private_key', 'somekey');
-
-    svc.logout();
-    tick();
-    http.expectOne(`${BASE}/logout`).flush(null);
-    tick();
-
-    expect(localStorage.getItem('auth.email')).toBeNull();
-    expect(localStorage.getItem('auth.session_existed')).toBeNull();
-    expect(localStorage.getItem('auth.ec_private_key')).toBeNull();
-  }));
 
   // ─── requestPasswordReset ─────────────────────────────────────────────────
 

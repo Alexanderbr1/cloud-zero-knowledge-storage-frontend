@@ -34,6 +34,11 @@ interface InitiateMultipartResponse {
   part_urls: Array<{ part_number: number; url: string }>;
 }
 
+interface UploadedPart {
+  part_number: number;
+  etag:        string;
+}
+
 interface ListBlobsResponse   { items: FileItem[]   }
 interface ListFoldersResponse { items: FolderItem[] }
 interface SearchResponse      { blobs: FileItem[]; folders: FolderItem[] }
@@ -178,6 +183,8 @@ export class FilesService {
 
     emit({ phase: 'reading', pct: 0 });
 
+    const parts: UploadedPart[] = [];
+
     try {
       for (let i = 0; i < chunkCount; i += UPLOAD_CONCURRENCY) {
         if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
@@ -192,12 +199,13 @@ export class FilesService {
         ));
 
         emit({ phase: 'uploading', pct: pct(i, chunkCount) });
-        await Promise.all(batch.map((idx, j) => {
+        const uploaded = await Promise.all(batch.map((idx, j) => {
           const url   = part_urls[idx]?.url;
           const frame = frames[j];
           if (!url || !frame) throw new Error(`Missing URL or frame for part ${idx + 1}`);
           return this.uploadPartWithRetry(url, frame, idx + 1, signal);
         }));
+        parts.push(...uploaded);
 
         emit({ phase: 'uploading', pct: pct(i + batch.length, chunkCount) });
       }
@@ -209,7 +217,7 @@ export class FilesService {
     }
 
     await firstValueFrom(
-      this.http.post<void>(`${this.baseUrl}/blobs/${enc(blob_id)}/complete-multipart`, {}),
+      this.http.post<void>(`${this.baseUrl}/blobs/${enc(blob_id)}/complete-multipart`, { parts }),
     );
 
     return blob_id;
@@ -221,11 +229,15 @@ export class FilesService {
     partNumber: number,
     signal:     AbortSignal,
     retries = UPLOAD_RETRIES,
-  ): Promise<void> {
+  ): Promise<UploadedPart> {
     for (let attempt = 0; attempt < retries; attempt++) {
       if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
       const resp = await fetch(url, { method: 'PUT', body: body.slice(0), signal });
-      if (resp.ok) return;
+      if (resp.ok) {
+        const etag = resp.headers.get('ETag') ?? resp.headers.get('etag');
+        if (!etag) throw new Error(`Part ${partNumber}: missing ETag in response`);
+        return { part_number: partNumber, etag: etag.replace(/"/g, '') };
+      }
       if (attempt < retries - 1)
         await new Promise(r => setTimeout(r, 500 * 2 ** attempt));
     }

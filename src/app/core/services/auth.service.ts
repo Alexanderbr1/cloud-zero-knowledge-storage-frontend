@@ -8,7 +8,9 @@ import type {
   LoginInitResponse,
   LoginFinalizeRequest,
   RegisterRequest,
-  TokenResponse,
+  RegisterResponse,
+  LoginFinalizeResponse,
+  RefreshResponse,
 } from '../../features/auth/models/auth.model';
 import { CryptoService } from './crypto.service';
 import { SrpService } from './srp.service';
@@ -17,7 +19,6 @@ import { fromBase64, toBase64 } from '../utils/encoding.utils';
 // ─── localStorage keys ───────────────────────────────────────────────────────
 
 const LS_EMAIL           = 'auth.email';
-const LS_EC_PRIVATE_KEY  = 'auth.ec_private_key'; // зашифрованный EC private key (двухуровневая обёртка KEK)
 const LS_CK_BLOB         = 'auth.ck_blob';         // AES-GCM(clientKey, password) — персистентность ключей между загрузками
 const LS_SESSION_EXISTED = 'auth.session_existed';  // сессия когда-либо существовала → refresh-кука может быть жива
 
@@ -64,7 +65,7 @@ export class AuthService {
   // ─── Сессия ──────────────────────────────────────────────────────────────
 
   tryRestoreSession(): Observable<boolean> {
-    return this.http.post<TokenResponse>(`${this.baseUrl}/refresh`, {}).pipe(
+    return this.http.post<RefreshResponse>(`${this.baseUrl}/refresh`, {}).pipe(
       tap(t => this.setAccessToken(t.access_token)),
       switchMap(t => from(this.tryRestoreKeysFromClientKey(t))),
       map(() => true),
@@ -73,9 +74,7 @@ export class AuthService {
   }
 
   async unlockSession(password: string): Promise<void> {
-    const resp = await firstValueFrom(
-      this.http.get<{ crypto_salt: string; kek_encrypted_master: string }>(`${this.baseUrl}/crypto-salt`)
-    );
+    const resp = await firstValueFrom(this.http.post<RefreshResponse>(`${this.baseUrl}/refresh`, {}));
     const masterKey = await this.crypto.deriveMasterKey(password, new Uint8Array(fromBase64(resp.crypto_salt)));
     let kek: CryptoKey;
     try {
@@ -85,12 +84,9 @@ export class AuthService {
     }
     this.masterKeySig.set(masterKey);
     this.kekSig.set(kek);
-    await this.loadECPrivateKey();
-    try {
-      const tokenResp = await firstValueFrom(this.http.post<TokenResponse>(`${this.baseUrl}/refresh`, {}));
-      this.setAccessToken(tokenResp.access_token);
-      if (tokenResp.client_key) await this.savePasswordBlob(password, tokenResp.client_key);
-    } catch {}
+    await this.loadECPrivateKey(resp.encrypted_private_key);
+    this.setAccessToken(resp.access_token);
+    await this.savePasswordBlob(password, resp.client_key);
   }
 
   // SRP-6a + Argon2id. Пароль браузер не покидает.
@@ -108,7 +104,7 @@ export class AuthService {
   }
 
   refreshSession(): Observable<void> {
-    return this.http.post<TokenResponse>(`${this.baseUrl}/refresh`, {}).pipe(
+    return this.http.post<RefreshResponse>(`${this.baseUrl}/refresh`, {}).pipe(
       tap(t => this.setAccessToken(t.access_token)),
       map(() => void 0),
     );
@@ -127,7 +123,7 @@ export class AuthService {
   logout(): void {
     // Clear state synchronously so guards see 'unauthenticated' on the next navigation.
     this.clearAccess();
-    this.lsRemove(LS_EMAIL, LS_EC_PRIVATE_KEY, LS_CK_BLOB, LS_SESSION_EXISTED);
+    this.lsRemove(LS_EMAIL, LS_CK_BLOB, LS_SESSION_EXISTED);
     this.emailSig.set(null);
     // Fire HTTP logout best-effort — the refresh cookie is cleared server-side.
     this.http.post<void>(`${this.baseUrl}/logout`, {}).pipe(take(1)).subscribe({ error: () => {} });
@@ -180,9 +176,7 @@ export class AuthService {
     this.emailSig.set(email);
   }
 
-  private async loadECPrivateKey(): Promise<void> {
-    const encB64 = this.lsRead(LS_EC_PRIVATE_KEY);
-    if (!encB64) return;
+  private async loadECPrivateKey(encB64: string): Promise<void> {
     const kek = this.kekSig();
     if (!kek) return;
     try {
@@ -200,22 +194,18 @@ export class AuthService {
     } catch {}
   }
 
-  private async tryRestoreKeysFromClientKey(tokenResp: TokenResponse): Promise<void> {
-    if (!tokenResp.client_key) return;
+  private async tryRestoreKeysFromClientKey(tokenResp: RefreshResponse): Promise<void> {
     const blob = this.lsRead(LS_CK_BLOB);
     if (!blob) return;
     try {
-      const password   = await this.crypto.decryptWithClientKey(blob, tokenResp.client_key);
-      const cryptoResp = await firstValueFrom(
-        this.http.get<{ crypto_salt: string; kek_encrypted_master: string }>(`${this.baseUrl}/crypto-salt`)
-      );
+      const password  = await this.crypto.decryptWithClientKey(blob, tokenResp.client_key);
       const masterKey = await this.crypto.deriveMasterKey(
         password,
-        new Uint8Array(fromBase64(cryptoResp.crypto_salt)),
+        new Uint8Array(fromBase64(tokenResp.crypto_salt)),
       );
       let kek: CryptoKey;
       try {
-        kek = await this.crypto.unwrapKEK(cryptoResp.kek_encrypted_master, masterKey);
+        kek = await this.crypto.unwrapKEK(tokenResp.kek_encrypted_master, masterKey);
       } catch {
         // Пароль сменился — blob устарел.
         this.lsRemove(LS_CK_BLOB);
@@ -223,7 +213,7 @@ export class AuthService {
       }
       this.masterKeySig.set(masterKey);
       this.kekSig.set(kek);
-      await this.loadECPrivateKey();
+      await this.loadECPrivateKey(tokenResp.encrypted_private_key);
       await this.savePasswordBlob(password, tokenResp.client_key);
     } catch {}
   }
@@ -275,9 +265,8 @@ export class AuthService {
       recovery_salt:          toBase64(recoverySalt),
     };
 
-    const resp = await firstValueFrom(this.http.post<TokenResponse>(`${this.baseUrl}/register`, payload));
+    const resp = await firstValueFrom(this.http.post<RegisterResponse>(`${this.baseUrl}/register`, payload));
 
-    this.lsWrite(LS_EC_PRIVATE_KEY, encryptedPrivateKeyB64);
     this.masterKeySig.set(masterKey);
     this.kekSig.set(kek);
     this._recoveryPhrase.set(recoveryPhrase);
@@ -286,7 +275,7 @@ export class AuthService {
     } catch {}
     this.setEmail(email.trim().toLowerCase());
     this.setAccessToken(resp.access_token);
-    if (resp.client_key) await this.savePasswordBlob(password, resp.client_key);
+    await this.savePasswordBlob(password, resp.client_key);
   }
 
   private async loginFlow(email: string, password: string): Promise<void> {
@@ -312,7 +301,7 @@ export class AuthService {
     });
 
     const finalResp = await firstValueFrom(
-      this.http.post<TokenResponse>(
+      this.http.post<LoginFinalizeResponse>(
         `${this.baseUrl}/login/finalize`,
         { session_id: initResp.session_id, M1: M1Hex } as LoginFinalizeRequest,
       )
@@ -321,23 +310,19 @@ export class AuthService {
     if (!finalResp.M2 || !verifyM2(finalResp.M2)) {
       throw new Error('SRP: server proof (M2) verification failed — possible MITM attack');
     }
-    if (!finalResp.kek_encrypted_master) {
-      throw new Error('Server response is missing kek_encrypted_master.');
-    }
+
 
     const masterKey = await this.crypto.deriveMasterKey(
       password,
       new Uint8Array(fromBase64(initResp.crypto_salt)),
     );
 
-    if (finalResp.encrypted_private_key) this.lsWrite(LS_EC_PRIVATE_KEY, finalResp.encrypted_private_key);
-
     this.masterKeySig.set(masterKey);
     await this.loadKEK(finalResp.kek_encrypted_master, masterKey);
-    await this.loadECPrivateKey();
+    await this.loadECPrivateKey(finalResp.encrypted_private_key);
     this.setEmail(normalizedEmail);
     this.setAccessToken(finalResp.access_token);
-    if (finalResp.client_key) await this.savePasswordBlob(password, finalResp.client_key);
+    await this.savePasswordBlob(password, finalResp.client_key);
   }
 
   private async resetPasswordFlow(token: string, recoveryPhrase: string, newPassword: string): Promise<void> {
